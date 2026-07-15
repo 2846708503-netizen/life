@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="zh-CN" dm-loaded="true"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>深渊论坛 · 慎入</title>
+<!-- 引入字体：标题艺术字 + 正文衬线体 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+QingKe+HuangYou&amp;family=Noto+Serif+SC:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   1. CSS 变量：集中管理配色，方便后期调整
+   ============================================================ */
+:root {
+    --bg-void:      #0a0a0a;   /* 极暗黑主背景 */
+    --bg-card:      #141414;   /* 深灰黑卡片背景 */
+    --bg-card-hi:   #1c1c1c;   /* 卡片高亮态 */
+    --blood-dark:   #8b0000;   /* 干涸血暗红（主题色） */
+    --blood-bright: #cc3333;   /* 亮红（强调色） */
+    --gold-dim:     #cc8833;   /* 暗金（楼主标识色） */
+    --text-main:    #b8b0a8;   /* 正文主色（泛旧的灰白） */
+    --text-dim:     #6a6560;   /* 次要文字 */
+    --text-faint:   #3a3632;   /* 极弱文字/分割 */
+    --border-soft:  #262626;   /* 柔和边框 */
+    --creepy:       #a83232;   /* 恐怖高亮文字色 */
+    --font-title:   'ZCOOL QingKe HuangYou', cursive;
+    --font-body:    'Noto Serif SC', serif;
+    --font-kai:     'KaiTi', 'STKaiti', '楷体', 'Noto Serif SC', serif; /* 背景幽灵字：楷书 */
+}
+
+/* ============================================================
+   2. 基础重置
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+    background-color: var(--bg-void);
+    color: var(--text-main);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    min-height: 100dvh;            /* 移动端动态视口高度（兼容地址栏伸缩） */
+    line-height: 1.7;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;  /* 禁止 iOS 横屏时自动放大字号 */
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;  /* 去掉安卓点击高亮块 */
+    overscroll-behavior-y: none;
+}
+
+/* 自定义滚动条，融入暗黑氛围 */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: #2a0000; border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--blood-dark); }
+
+/* ============================================================
+   3. 全局特效层：暗角 + CRT扫描线 + 背景幽灵字
+   全部 pointer-events:none，不影响交互
+   ============================================================ */
+
+/* 暗角：四周压暗，聚焦中心 */
+.fx-vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    background: radial-gradient(ellipse at center,
+        transparent 40%,
+        rgba(0,0,0,0.55) 90%,
+        rgba(0,0,0,0.9) 100%);
+}
+
+/* CRT 扫描线：横向重复的暗线 + 轻微滚动 */
+.fx-scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background: repeating-linear-gradient(
+        to bottom,
+        rgba(0,0,0,0) 0px,
+        rgba(0,0,0,0) 2px,
+        rgba(0,0,0,0.18) 3px,
+        rgba(0,0,0,0.18) 4px
+    );
+    animation: scanMove 8s linear infinite;
+    opacity: 0.6;
+}
+@keyframes scanMove {
+    from { background-position: 0 0; }
+    to   { background-position: 0 100px; }
+}
+
+/* 背景幽灵字：极低透明度的汉字缓慢浮动 */
+.ghost-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+.ghost-char {
+    position: absolute;
+    font-family: var(--font-kai);
+    color: #ffffff;
+    opacity: 0.03;
+    font-size: 22vw;
+    user-select: none;
+    animation: ghostFloat 22s ease-in-out infinite;
+}
+@keyframes ghostFloat {
+    0%   { transform: translate(0, 0) rotate(0deg) scale(1); }
+    25%  { transform: translate(3vw, -4vh) rotate(3deg) scale(1.05); }
+    50%  { transform: translate(-2vw, 3vh) rotate(-2deg) scale(0.97); }
+    75%  { transform: translate(2vw, 2vh) rotate(1deg) scale(1.03); }
+    100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+}
+
+/* ============================================================
+   4. 视图容器：三个视图默认隐藏，由 JS 控制显示
+   ============================================================ */
+.view { display: none; position: relative; z-index: 1; }
+.view.active { display: block; }
+
+/* ============================================================
+   5. 登录页
+   ============================================================ */
+#view-login.active {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 20px;
+    padding: 20px calc(20px + env(safe-area-inset-right)) 20px calc(20px + env(safe-area-inset-left));
+}
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-soft);
+    padding: 45px 35px;
+    box-shadow: 0 0 40px rgba(139,0,0,0.15), inset 0 0 60px rgba(0,0,0,0.5);
+    position: relative;
+    animation: loginFadeIn 1.2s ease-out;
+}
+@keyframes loginFadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.login-title {
+    font-family: var(--font-title);
+    font-size: 42px;
+    color: var(--blood-dark);
+    text-align: center;
+    letter-spacing: 4px;
+    margin-bottom: 8px;
+    text-shadow: 0 0 15px rgba(139,0,0,0.4);
+}
+.login-sub {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    letter-spacing: 2px;
+    margin-bottom: 35px;
+}
+.field { margin-bottom: 20px; }
+.field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+}
+.field input {
+    width: 100%;
+    background: #0d0d0d;
+    border: 1px solid var(--border-soft);
+    color: var(--text-main);
+    padding: 12px 14px;
+    font-family: var(--font-body);
+    font-size: 16px;               /* ≥16px 避免 iOS 聚焦时自动缩放 */
+    outline: none;
+    transition: all 0.3s;
+}
+.field input:focus {
+    border-color: var(--blood-dark);
+    box-shadow: 0 0 12px rgba(139,0,0,0.3);
+    background: #100808;
+}
+.btn-enter {
+    width: 100%;
+    background: linear-gradient(180deg, #3a0000, var(--blood-dark));
+    border: 1px solid var(--blood-bright);
+    color: #e8d8d0;
+    padding: 14px;
+    font-family: var(--font-title);
+    font-size: 20px;
+    letter-spacing: 6px;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: all 0.3s;
+}
+.btn-enter:hover {
+    background: linear-gradient(180deg, var(--blood-dark), var(--blood-bright));
+    box-shadow: 0 0 25px rgba(204,51,51,0.5);
+    letter-spacing: 8px;
+}
+.login-warn {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px dashed var(--text-faint);
+    font-size: 11px;
+    color: var(--text-faint);
+    text-align: center;
+    line-height: 1.9;
+    letter-spacing: 1px;
+}
+.login-warn .blink { color: var(--blood-dark); animation: warnBlink 2.5s infinite; }
+@keyframes warnBlink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+/* ============================================================
+   6. 论坛通用：吸顶 Header
+   ============================================================ */
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,10,10,0.92);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--blood-dark);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.site-logo {
+    font-family: var(--font-title);
+    font-size: 26px;
+    color: var(--blood-bright);
+    letter-spacing: 3px;
+    text-shadow: 0 0 10px rgba(204,51,51,0.4);
+    cursor: pointer;
+}
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 13px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+}
+.online-count { color: var(--text-main); }
+.online-count b { color: var(--blood-bright); font-family: var(--font-body); }
+.online-count.abnormal b { color: #fff; text-shadow: 0 0 10px #fff; animation: glitchNum 0.3s; }
+@keyframes glitchNum { 0%{transform:translateX(-2px);} 50%{transform:translateX(2px);} 100%{transform:translateX(0);} }
+.cur-user { color: var(--gold-dim); }
+.btn-logout {
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--text-dim);
+    padding: 5px 12px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 12px;
+    transition: all 0.3s;
+}
+.btn-logout:hover { border-color: var(--blood-dark); color: var(--blood-bright); }
+
+/* 主内容容器 */
+.container { max-width: 860px; margin: 0 auto; padding: 24px 20px 80px; }
+
+/* ============================================================
+   7. 公告栏
+   ============================================================ */
+.notice {
+    background: linear-gradient(90deg, rgba(139,0,0,0.12), transparent);
+    border-left: 3px solid var(--blood-dark);
+    padding: 14px 18px;
+    margin-bottom: 28px;
+    font-size: 14px;
+    color: var(--text-dim);
+}
+.notice-title {
+    color: var(--blood-bright);
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+/* ============================================================
+   8. 帖子列表
+   ============================================================ */
+.section-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border-soft);
+    padding-bottom: 8px;
+}
+.section-bar h2 {
+    font-family: var(--font-title);
+    font-size: 22px;
+    color: var(--text-main);
+    letter-spacing: 2px;
+    font-weight: normal;
+}
+.post-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-soft);
+    border-left: 3px solid transparent;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+}
+.post-card:hover {
+    background: var(--bg-card-hi);
+    border-left-color: var(--blood-bright);
+    transform: translateX(8px);
+    box-shadow: -4px 0 15px rgba(139,0,0,0.2);
+}
+.post-card-title {
+    font-size: 16px;
+    color: var(--text-main);
+    margin-bottom: 8px;
+    font-weight: 600;
+    transition: color 0.25s;
+}
+.post-card:hover .post-card-title { color: var(--blood-bright); }
+/* 分类标签（颜色由 JS 按分类赋予） */
+.post-cat {
+    display: inline-block;
+    font-size: 12px;
+    padding: 3px 12px;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+    border-radius: 3px;
+    font-weight: 600;
+}
+/* 正文摘要（最多两行） */
+.post-excerpt {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.7;
+    margin-bottom: 14px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.post-card-meta .mi { display: inline-flex; align-items: center; gap: 5px; }
+.post-card-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.post-card-meta .tag {
+    color: var(--blood-dark);
+    border: 1px solid var(--blood-dark);
+    padding: 0 6px;
+    font-size: 11px;
+}
+
+/* ============================================================
+   9. 帖子详情页
+   ============================================================ */
+.btn-back {
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--text-dim);
+    padding: 6px 14px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 13px;
+    margin-bottom: 20px;
+    transition: all 0.3s;
+}
+.btn-back:hover { border-color: var(--blood-dark); color: var(--blood-bright); }
+.detail-title {
+    font-family: var(--font-title);
+    font-size: 28px;
+    color: var(--text-main);
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    line-height: 1.4;
+    font-weight: normal;
+}
+.detail-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border-soft);
+    padding-bottom: 16px;
+}
+
+/* 楼层 */
+.floor {
+    background: var(--bg-card);
+    border: 1px solid var(--border-soft);
+    border-left: 3px solid var(--border-soft);
+    padding: 18px 22px;
+    margin-bottom: 14px;
+    animation: floorFade 0.5s ease-out;
+}
+@keyframes floorFade { from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+.floor.op {
+    border-left-color: var(--gold-dim);
+    box-shadow: -3px 0 12px rgba(204,136,51,0.08);
+}
+.floor-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--text-faint);
+}
+.floor-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.floor-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;                /* 圆形头像 */
+    background: #444;                  /* 兜底色，实际由 JS 按 ID 赋色 */
+    border: none;
+    display: flex; align-items: center; justify-content: center;
+    color: #f5f0eb;
+    font-size: 16px;
+    font-weight: 600;
+    flex-shrink: 0;
+    user-select: none;
+}
+.floor-name { font-size: 14px; color: var(--text-main); }
+.floor.op .floor-name { color: var(--gold-dim); font-weight: 600; }
+.floor-badge {
+    font-size: 10px;
+    background: var(--gold-dim);
+    color: #000;
+    padding: 1px 6px;
+    margin-left: 6px;
+}
+.floor-num { font-size: 12px; color: var(--text-faint); }
+.floor-body { font-size: 15px; color: var(--text-main); }
+.floor-body p { margin-bottom: 12px; }
+.floor-body p:last-child { margin-bottom: 0; }
+
+/* 帖子正文可渲染的富文本元素 */
+.creepy-text {
+    color: var(--creepy);
+    text-shadow: 0 0 8px rgba(168,50,50,0.4);
+    letter-spacing: 1px;
+}
+.quote-block {
+    background: #0d0d0d;
+    border-left: 2px solid var(--blood-dark);
+    padding: 10px 14px;
+    margin: 12px 0;
+    color: var(--text-dim);
+    font-size: 14px;
+    font-style: italic;
+}
+
+.btn-loadmore {
+    display: block;
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px dashed var(--text-faint);
+    color: var(--text-dim);
+    padding: 14px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 14px;
+    letter-spacing: 2px;
+    margin-top: 8px;
+    transition: all 0.3s;
+}
+.btn-loadmore:hover { border-color: var(--blood-dark); color: var(--blood-bright); background: #100808; }
+
+/* ============================================================
+   10. 解析器面板
+   ============================================================ */
+.parser-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-soft);
+    margin-bottom: 28px;
+    display: none;                     /* 默认隐藏，仅管理员登录后可见 */
+}
+.parser-head {
+    padding: 12px 18px;
+    background: #0d0d0d;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+.parser-head span { color: var(--gold-dim); font-size: 14px; letter-spacing: 2px; }
+.parser-head .toggle { color: var(--text-dim); font-size: 12px; }
+.parser-body { padding: 18px; display: none; }
+.parser-body.open { display: block; }
+.parser-body textarea {
+    width: 100%;
+    height: 220px;
+    background: #0d0d0d;
+    border: 1px solid var(--border-soft);
+    color: var(--text-main);
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    outline: none;
+    resize: vertical;
+}
+.parser-body textarea:focus { border-color: var(--blood-dark); }
+.parser-actions { display: flex; gap: 12px; margin-top: 12px; align-items: center; }
+.btn-parse {
+    background: linear-gradient(180deg, #3a0000, var(--blood-dark));
+    border: 1px solid var(--blood-bright);
+    color: #e8d8d0;
+    padding: 10px 22px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 14px;
+    letter-spacing: 2px;
+    transition: all 0.3s;
+}
+.btn-parse:hover { box-shadow: 0 0 18px rgba(204,51,51,0.4); }
+.parse-msg { font-size: 13px; }
+.parse-msg.ok { color: var(--gold-dim); }
+.parse-msg.err { color: var(--blood-bright); }
+.parser-hint {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-faint);
+    line-height: 1.8;
+    border-top: 1px dashed var(--text-faint);
+    padding-top: 10px;
+    white-space: pre-wrap;
+}
+
+/* 轻提示 Toast */
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 40px;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(20,20,20,0.95);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-dim);
+    padding: 12px 26px;
+    font-size: 14px;
+    letter-spacing: 2px;
+    z-index: 10000;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.4s ease;
+    box-shadow: 0 0 24px rgba(204,136,51,0.25);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ============================================================
+   响应式 / 移动端适配（Android / iOS）
+   ============================================================ */
+@media (max-width: 600px) {
+    .site-header {
+        padding: 10px 16px;
+        padding-left: calc(16px + env(safe-area-inset-left));
+        padding-right: calc(16px + env(safe-area-inset-right));
+    }
+    .site-logo { font-size: 20px; letter-spacing: 2px; }
+    .header-right { gap: 10px; font-size: 12px; width: 100%; justify-content: space-between; }
+    .btn-logout { padding: 5px 10px; }
+
+    .container {
+        padding: 16px 14px;
+        padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    }
+
+    .login-card { padding: 34px 22px; }
+    .login-title { font-size: 32px; }
+    .login-sub { margin-bottom: 26px; }
+
+    .notice { font-size: 13px; padding: 12px 14px; }
+    .section-bar h2 { font-size: 19px; }
+
+    .post-card { padding: 14px 16px; }
+    .post-card-title { font-size: 15px; }
+    .post-excerpt { font-size: 12px; }
+    .post-card-meta { gap: 12px; font-size: 11px; }
+    .post-cat { font-size: 11px; padding: 2px 10px; }
+
+    .detail-title { font-size: 20px; }
+    .floor { padding: 14px 16px; }
+    .floor-body { font-size: 14px; }
+    .floor-avatar { width: 32px; height: 32px; font-size: 14px; }
+    .floor-num { font-size: 11px; }
+
+    .parser-body { padding: 14px; }
+    .parser-body textarea { height: 180px; font-size: 16px; }  /* 16px 防 iOS 聚焦缩放 */
+    .parser-actions { flex-wrap: wrap; gap: 8px; }
+    .btn-parse { flex: 1 1 auto; text-align: center; }
+
+    .toast { left: 16px; right: 16px; transform: translateY(20px); width: auto; text-align: center; }
+    .toast.show { transform: translateY(0); }
+}
+
+@media (max-width: 380px) {
+    .login-title { font-size: 28px; }
+    .header-right { font-size: 11px; gap: 8px; }
+    .btn-enter { font-size: 18px; letter-spacing: 4px; }
+}
+
+/* 触摸设备：去掉会“卡住”的悬停位移，改用点击反馈 */
+@media (hover: none) {
+    .post-card:hover {
+        transform: none;
+        box-shadow: none;
+        background: var(--bg-card);
+        border-left-color: transparent;
+    }
+    .post-card:hover .post-card-title { color: var(--text-main); }
+    .post-card:active {
+        background: var(--bg-card-hi);
+        border-left-color: var(--blood-bright);
+    }
+    .post-card:active .post-card-title { color: var(--blood-bright); }
+    .btn-enter:active, .btn-parse:active, .btn-loadmore:active,
+    .btn-logout:active, .btn-back:active { opacity: 0.75; }
+}
+</style>
+<style id="_goober"> @keyframes go2264125279{from{transform:scale(0) rotate(45deg);opacity:0;}to{transform:scale(1) rotate(45deg);opacity:1;}}@keyframes go3020080000{from{transform:scale(0);opacity:0;}to{transform:scale(1);opacity:1;}}@keyframes go463499852{from{transform:scale(0) rotate(90deg);opacity:0;}to{transform:scale(1) rotate(90deg);opacity:1;}}@keyframes go1268368563{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}@keyframes go1310225428{from{transform:scale(0) rotate(45deg);opacity:0;}to{transform:scale(1) rotate(45deg);opacity:1;}}@keyframes go651618207{0%{height:0;width:0;opacity:0;}40%{height:0;width:6px;opacity:1;}100%{opacity:1;height:10px;}}@keyframes go901347462{from{transform:scale(0.6);opacity:0.4;}to{transform:scale(1);opacity:1;}}.go4109123758{z-index:9999;}.go4109123758 > *{pointer-events:auto;}</style></head>
+<body>
+<script>window.__PRELOADED_POSTS__=[{"id":"p_mrm3o9du_lteg","title":"【树洞】救命啊独居女生快被家里的电器吓哭了，是不是进贼了还是漏电啊？","titleClean":"救命啊独居女生快被家里的电器吓哭了，是不是进贼了还是漏电啊？","category":"树洞","excerpt":"家人们谁懂啊，我真的要崩溃了😭😭。我一个人租在腾岳市高新区那边的公寓，最近几天家里的电器特别邪门！前天半夜，我那个小爱音箱突然自己亮了，","views":3062,"date":"刚刚","opId":"软糖不软_","floors":[{"floorLabel":"#1 楼","author":"软糖不软_","contentHTML":"<p>家人们谁懂啊，我真的要崩溃了😭😭。我一个人租在腾岳市高新区那边的公寓，最近几天家里的电器特别邪门！前天半夜，我那个小爱音箱突然自己亮了，发出那种“嘶嘶”的电流声，仔细听特别像人在喘气！我以为是串频了，结果拔掉电源它居然还响了两秒才停！<\/p><p>还有那个扫地机器人，大半夜不睡觉，疯狂撞我卧室的门，撞得砰砰响，我出去一看它机身烫得根本摸不得！最离谱的是我的手机，昨晚充着电，半夜把我烫醒了，拿起来感觉有50多度，屏幕还一直闪雪花！我是不是遇到灵异事件了？还是家里线路老化漏电了？我现在躲在被子里不敢出去，救命啊！<\/p>"},{"floorLabel":"#2 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，楼主快跑！音箱喘气那是脏东西在试着跟你沟通呢！扫地机撞门是想进你卧室！你别躲被子里了，被子挡不住阴气的，赶紧拿件外套去人多的地方！<\/p>"},{"floorLabel":"#3 楼","author":"纯爱战神应声倒地","contentHTML":"<p>前排吃瓜😋。编，接着编，现在为了水经验连独居女生的人设都用上了？下一步是不是要爆照求保护了？<\/p>"},{"floorLabel":"#4 楼","author":"华强北修哥","contentHTML":"<p>楼主别自己吓自己。音箱电流麦是蓝牙模块受潮或者Wi-Fi信道干扰；扫地机撞墙是激光雷达进了灰或者主板短路；手机发烫就是电池老化鼓包了。建议找个电工师傅来看看线路，别整天神神叨叨的。<\/p>"},{"floorLabel":"#5 楼","author":"花开富贵","contentHTML":"<p>回复 华强北修哥 : 你这人怎么这么冷血啊！人家小姑娘都吓哭了你还在这扯什么物理化学的？电器半夜自己动，那就是家里不干净！楼主听我的，明早去城隍庙求个符！<\/p>"},{"floorLabel":"#6 楼","author":"乐子人永不眠","contentHTML":"<p>🤪扫地机：我要进卧室！ 脏东西：我要进卧室！ 楼主：你们俩商量好再进来行不行？<\/p>"},{"floorLabel":"#7 楼","author":"软糖不软_","contentHTML":"<p>回复 华强北修哥 : 修哥，我手机是上周刚换的新电池，而且音箱我拔了电源它还响啊！这怎么解释？我现在手都在抖，打字都打不利索了😢。<\/p>"},{"floorLabel":"#8 楼","author":"茅山小王_接急单","contentHTML":"<p>回复 软糖不软_ : 拔了电源还响，那是它吸了周围的磁场！妹子你听哥一句劝，这屋子风水破了，赶紧搬走，或者私信哥，哥给你寄点朱砂。<\/p>"},{"floorLabel":"#9 楼","author":"理工男不秃头","contentHTML":"<p>拔电源还响是因为音箱里面有电容！电容放电懂不懂？高中物理没学好吗？还有手机发烫，你检查一下是不是后台有挖矿木马，最近腾岳市这边挺多这种流氓软件的。<\/p>"},{"floorLabel":"#10 楼","author":"键盘侠本侠","contentHTML":"<p>乐，经典理工男解释一切。等会儿楼主家电视自己打开播放贞子的时候，你再去跟贞子解释一下显像管原理呗？😅<\/p>"},{"floorLabel":"#11 楼","author":"花开富贵","contentHTML":"<p>就是就是，现在的年轻人读书读傻了，一点都不敬畏。楼主你别听他们的，赶紧在床头放把剪刀，剪刀辟邪！<\/p>"},{"floorLabel":"#12 楼","author":"软糖不软_","contentHTML":"<p>家人们，我实在受不了了，刚才扫地机又在客厅转圈，声音特别大，而且我感觉到客厅温度好像变高了，闷闷的。我收拾了包包，现在准备去我闺蜜家借宿几天，这房子我是一天也不敢住了😭。<\/p>"},{"floorLabel":"#13 楼","author":"纯爱战神应声倒地","contentHTML":"<p>哟，真跑了？我还以为你要直播捉鬼呢，没劲，散了散了。<\/p>"},{"floorLabel":"#14 楼","author":"茅山小王_接急单","contentHTML":"<p>跑得好！那种环境待久了阳气会被吸干的。到了闺蜜家记得跨个火盆，别把东西带过去了。<\/p>"},{"floorLabel":"#15 楼","author":"华强北修哥","contentHTML":"<p>客厅温度变高？你是不是没开空调，加上那些电器短路发热导致的？去闺蜜家可以，但记得找个专业电工去查查空气开关，别回头引起火灾。<\/p>"},{"floorLabel":"#16 楼","author":"花开富贵","contentHTML":"<p>回复 华强北修哥 : 你烦不烦啊？人家都吓跑了你还在这杠！火灾？我看是阴火吧！<\/p>"},{"floorLabel":"#17 楼","author":"乐子人永不眠","contentHTML":"<p>电工师傅上门：这活儿我干不了，得请林正英来。🤪<\/p>"},{"floorLabel":"#18 楼","author":"软糖不软_","contentHTML":"<p>我已经到闺蜜家了，她家电器都正常，我手机也不烫了。但是刚才我出门的时候，回头看了一眼我的智能门锁，那个密码按键居然在乱闪，跟有鬼在按一样……我明天就去找房东退租！<\/p>"},{"floorLabel":"#19 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，门锁乱闪，这是脏东西想跟着你出来啊！妹子你今晚别睡了，盯着点你闺蜜家的门！<\/p>"},{"floorLabel":"#20 楼","author":"纯爱战神应声倒地","contentHTML":"<p>房东：退租可以，押金不退。 鬼：退租可以，我跟着你。😋<\/p>"},{"floorLabel":"#21 楼","author":"理工男不秃头","contentHTML":"<p>智能门锁按键乱闪是静电或者面板受潮短路……算了，毁灭吧，解释累了。<\/p>"},{"floorLabel":"#22 楼","author":"花开富贵","contentHTML":"<p>回复 理工男不秃头 : 滚啊冷血动物！楼主别理他，今晚默念阿弥陀佛！<\/p>"},{"floorLabel":"#23 楼","author":"软糖不软_","contentHTML":"<p>谢谢大家的关心，我闺蜜陪我聊了半天，现在好多了。明天白天我找几个男同事陪我去把东西搬走，这房子谁爱租谁租吧，吓死本宝宝了，电费还死贵。帖子就到这里吧，不敢再回想了。<\/p>"},{"floorLabel":"#24 楼","author":"乐子人永不眠","contentHTML":"<p>楼主好人一生平安，记得把房子推给下一个受害者🤪。<\/p>"},{"floorLabel":"#25 楼","author":"茅山小王_接急单","contentHTML":"<p>福生无量天尊，妹子平安就好。有需要看事随时私信哥，给你打八折。<\/p>"}]},{"id":"p_mrm3o9du_574p","title":"【吐槽】腾岳市这破车企能不能行了？车机中病毒差点害老子出车祸！","titleClean":"腾岳市这破车企能不能行了？车机中病毒差点害老子出车祸！","category":"吐槽","excerpt":"老子真特么服了！今天跑夜班，开着那破新能源跑滴滴。走到腾岳大道高架上的时候，中控屏突然“唰”一下全变成雪花屏了！导航也不说话了，一直瞎指，让","views":9924,"date":"刚刚","opId":"腾岳老李代驾","floors":[{"floorLabel":"#1 楼","author":"腾岳老李代驾","contentHTML":"<p>老子真特么服了！今天跑夜班，开着那破新能源跑滴滴。走到腾岳大道高架上的时候，中控屏突然“唰”一下全变成雪花屏了！导航也不说话了，一直瞎指，让我往护栏上开！<\/p><p>最邪门的是，明明开着冷空调，车里温度突然飙升，烫得老子后背全湿了，方向盘都烫手！我特么赶紧靠边停车，结果车机死机，车门都打不开，差点没把我憋死在里面！这绝壁是4S店给老子刷了带病毒的盗版系统，或者车机硬件有暗病！明天老子就去拉横幅投诉他们！<\/p>"},{"floorLabel":"#2 楼","author":"秋名山五菱宏光","contentHTML":"<p>前排吃瓜😋。老李啊，你这哪是车机中病毒，你这是车里拉了个“烫手”的乘客吧？是不是后座有个看不见的老妹儿在给你加热啊？🤪<\/p>"},{"floorLabel":"#3 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，老哥你这情况不对啊！高架、半夜、雪花屏、温度升高，这是撞上路煞了！车里有脏东西在吸你的阳气呢！赶紧买两包华子，在十字路口烧了送送神！<\/p>"},{"floorLabel":"#4 楼","author":"汽修厂大拿","contentHTML":"<p>老李你冷静点。雪花屏是车机主板虚焊或者排线松了；导航乱指是GPS模块死机；车内升温是因为空调压缩机继电器粘连，一直制热。这属于典型的电控系统故障，去4S店读个故障码就行了，别扯什么病毒。<\/p>"},{"floorLabel":"#5 楼","author":"腾岳老李代驾","contentHTML":"<p>回复 汽修厂大拿 : 读个屁的故障码！老子去了三次4S店了，每次都说没毛病！而且刚才温度高得离谱，空调出风口吹出来的风都是滚烫的，这特么是继电器粘连能解释的？你懂个锤子！<\/p>"},{"floorLabel":"#6 楼","author":"乐子人永不眠","contentHTML":"<p>4S店：这锅我们不背，建议老李去请个道士给车做个法。 老李：道士说这车八字太硬，克主😅 。<\/p>"},{"floorLabel":"#7 楼","author":"花开富贵","contentHTML":"<p>就是啊，现在的修车师傅就会推卸责任。老李你听大妈的，去买个开光的车挂，挂在后视镜上，保平安的！<\/p>"},{"floorLabel":"#8 楼","author":"理工男不秃头","contentHTML":"<p>其实老李说的温度异常，有可能是电池热失控的前兆。建议老李赶紧检查一下底盘电池包，别到时候自燃了就真完了。科学点，别整那些封建迷信。<\/p>"},{"floorLabel":"#9 楼","author":"纯爱战神应声倒地","contentHTML":"<p>编，接着编。还温度高得离谱，你当你在炼丹炉里啊？下次是不是要说车自己开去火葬场了？<\/p>"},{"floorLabel":"#10 楼","author":"茅山小王_接急单","contentHTML":"<p>回复 理工男不秃头 : 你懂个屁！电池热失控能有雪花屏？这是典型的阴气干扰磁场！冷血动物一边去！<\/p>"},{"floorLabel":"#11 楼","author":"腾岳老李代驾","contentHTML":"<p>老子现在在4S店门口蹲着呢，天一亮我就堵门！刚才我在车里等救援的时候，中控屏虽然黑了，但我听到音响里一直有那种“滋滋”的声音，像是有好几个人在里面窃窃私语！这特么不是闹鬼是什么？车企绝对在后台搞什么窃听监控！<\/p>"},{"floorLabel":"#12 楼","author":"键盘侠本侠","contentHTML":"<p>好家伙，窃听监控都出来了。老李你是不是平时在车里看那种片子看多了，音响在给你回放呢？🤪<\/p>"},{"floorLabel":"#13 楼","author":"汽修厂大拿","contentHTML":"<p>音响有杂音是功放模块受潮或者搭铁不良。老李，你如果怀疑车企后台搞鬼，可以找第三方机构做数据鉴定，拉横幅是解决不了问题的。<\/p>"},{"floorLabel":"#14 楼","author":"花开富贵","contentHTML":"<p>老李别听他们的，这车不能开了，赶紧卖了吧，二手车贩子收走就没事了。<\/p>"},{"floorLabel":"#15 楼","author":"乐子人永不眠","contentHTML":"<p>二手车贩子：我收车只看车况，不看车里有没有鬼。😋<\/p>"},{"floorLabel":"#16 楼","author":"华强北修哥","contentHTML":"<p>老李，你那个“滋滋”声，我怀疑是车机系统的底层芯片在超频运转。最近腾岳市这边很多电子设备都有这毛病，可能是某种未知的电磁干扰。<\/p>"},{"floorLabel":"#17 楼","author":"观测者_04","contentHTML":"<p>各位，从现象学角度分析，中控雪花屏与局部热力学异常（车内温度飙升），并非单纯的硬件故障。这更符合一种“算力征用”的特征。某种高维度的信息流正在强行接管物理设备的计算单元，导致电能转化为热能溢出。建议立刻切断全车电源，远离该车辆。<\/p>"},{"floorLabel":"#18 楼","author":"纯爱战神应声倒地","contentHTML":"<p>回复 观测者_04 : 卧槽，哪来的中二病？还“算力征用”、“高维度信息流”，你三体看多了吧？赶紧回你的ETO去，别在这水经验了😅。<\/p>"},{"floorLabel":"#19 楼","author":"茅山小王_接急单","contentHTML":"<p>回复 观测者_04 : 神特么算力征用，你当是变形金刚啊？这就是撞邪了！不懂别瞎哔哔！<\/p>"},{"floorLabel":"#20 楼","author":"腾岳老李代驾","contentHTML":"<p>回复 观测者_04 : 你谁啊？少在这跟老子扯什么科幻电影！老子只知道老子差点被撞死！明天必须让4S店给老子换台新车，不然这事没完！<\/p>"},{"floorLabel":"#21 楼","author":"乐子人永不眠","contentHTML":"<p>观测者_04：其实我是搞量子力学的，最近正创作了一篇数字人格的论文，可惜这里地方太小，写不下。 网友：散了吧，这哥们病情又加重了。🤣👉🤡<\/p>"},{"floorLabel":"#22 楼","author":"理工男不秃头","contentHTML":"<p>虽然17楼说得神乎其神，但“电能转化为热能溢出”这个物理逻辑倒是没毛病。不过归结于“算力征用”就太扯了，多半是车机系统中了勒索病毒在后台疯狂挖矿。<\/p>"},{"floorLabel":"#23 楼","author":"花开富贵","contentHTML":"<p>挖矿？挖什么矿？老李你车里还藏了金矿啊？别听他们瞎扯，赶紧去庙里拜拜车神！<\/p>"},{"floorLabel":"#24 楼","author":"腾岳老李代驾","contentHTML":"<p>不跟你们扯了，4S店经理来了，老子要去跟他干架了！今天不赔老子误工费和精神损失费，老子就睡他们大厅！这破车，狗都不开！<\/p>"},{"floorLabel":"#25 楼","author":"秋名山五菱宏光","contentHTML":"<p>老李威武！记得开直播，兄弟们给你刷火箭！顺便看看4S店大厅有没有鬼😋。<\/p>"}]},{"id":"p_mrm3o9du_gxte","title":"【探究】腾岳市翠湖小区全网瘫痪，测出异常电波，这到底是怎么回事？","titleClean":"腾岳市翠湖小区全网瘫痪，测出异常电波，这到底是怎么回事？","category":"探究","excerpt":"大家好，我是数码区UP主老张。今天发个帖记录一下我们小区发生的诡异事件。 坐标腾岳市翠湖小区，今晚8点左右，整个小区的网络突然全断了。不仅是","views":2488,"date":"刚刚","opId":"极客老张","floors":[{"floorLabel":"#1 楼","author":"极客老张","contentHTML":"<p>大家好，我是数码区UP主老张。今天发个帖记录一下我们小区发生的诡异事件。<\/p><p>坐标腾岳市翠湖小区，今晚8点左右，整个小区的网络突然全断了。不仅是Wi-Fi，连手机5G信号都满格但上不了网。更诡异的是，我家里所有的电子设备（手机、电脑、甚至旧电视）都在疯狂发热，我那个老式显像管电视甚至爆了火花！<\/p><p>我拿频谱分析仪测了一下，发现空气中弥漫着一种极高频率的异常电波，这绝对不是普通的基站故障或者路由器串频。有懂行的大佬来分析一下吗？<\/p>"},{"floorLabel":"#2 楼","author":"通信工程狗","contentHTML":"<p>张哥，你这描述有点像基站的光模块被雷击了，或者小区机房的光猫集体死机。至于设备发热，可能是电压不稳导致的。建议直接打10000号报修。<\/p>"},{"floorLabel":"#3 楼","author":"纯爱战神应声倒地","contentHTML":"<p>前排吃瓜😋。UP主这是又要恰饭了吧？先铺垫一波网络瘫痪，下一楼是不是就要推荐你橱窗里的“穿墙王”路由器了？编，接着编。<\/p>"},{"floorLabel":"#4 楼","author":"花开富贵","contentHTML":"<p>哎哟，整个小区都这样，那是小区风水出问题了吧？是不是最近小区里动土修路，挖断了地脉？赶紧让物业去请个大师来看看吧！<\/p>"},{"floorLabel":"#5 楼","author":"华强北修哥","contentHTML":"<p>老张，旧电视爆火花可能是高压包老化击穿。设备集体发热，我怀疑是小区配电房的零线断了，导致三相电不平衡，电压飙升到380V了！这很危险，赶紧拉闸！<\/p>"},{"floorLabel":"#6 楼","author":"极客老张","contentHTML":"<p>回复 通信工程狗 : 报修了，运营商说基站数据正常。回复 华强北修哥 : 我测了入户电压，220V非常稳定，排除了零线断线的可能。这绝对不是普通的硬件故障。<\/p>"},{"floorLabel":"#7 楼","author":"乐子人永不眠","contentHTML":"<p>🤪运营商：基站正常。 华强北：电压正常。 老张：那一定是外星人入侵了！ 建议老张赶紧联系三体舰队。<\/p>"},{"floorLabel":"#8 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，电视爆火花，这是大凶之兆啊！张哥你赶紧看看小区最近有没有死人，或者有没有人跳楼！这是阴气太重，干扰了阳间的电磁场！<\/p>"},{"floorLabel":"#9 楼","author":"理工男不秃头","contentHTML":"<p>回复 茅山小王_接急单 : 神特么阴气干扰电磁场，你咋不说鬼魂是等离子体呢？老张，你那频谱仪测出来的具体频率是多少？有没有可能是附近雷达站或者气象探测设备的旁瓣干扰？<\/p>"},{"floorLabel":"#10 楼","author":"键盘侠本侠","contentHTML":"<p>乐，这年头连鬼都要学物理了。老张别理他们，直接上示波器抓包，看看这电波到底在传输什么数据。😋<\/p>"},{"floorLabel":"#11 楼","author":"极客老张","contentHTML":"<p>更新一下进展。我用SDR（软件无线电）抓取了部分电波信号，解调后发现这不是杂音，而是一种高度加密的脉冲信号！而且，这个信号的频率在2.4GHz和5GHz之间快速跳频，完美避开了常规Wi-Fi信道。最可怕的是，我家里那些发热的设备，它们的CPU占用率全都是100%！它们在被迫处理这些信号！<\/p>"},{"floorLabel":"#12 楼","author":"通信工程狗","contentHTML":"<p>卧槽？CPU占用100%？这特么是中了僵尸网络病毒吧！有人把你们小区的设备当成肉鸡，在搞DDoS攻击或者挖矿！张哥赶紧拔网线啊！<\/p>"},{"floorLabel":"#13 楼","author":"花开富贵","contentHTML":"<p>什么僵尸什么肉鸡的，听着就吓人！这就是中邪了！张哥你赶紧在门口撒点糯米，别被脏东西缠上了！<\/p>"},{"floorLabel":"#14 楼","author":"纯爱战神应声倒地","contentHTML":"<p>😅 编得越来越离谱了，还SDR抓包，还跳频。老张你为了水经验连专业术语都堆上了？有本事把抓包数据截图发出来啊！<\/p>"},{"floorLabel":"#15 楼","author":"华强北修哥","contentHTML":"<p>如果真的是CPU满载，那设备发热就解释得通了。但什么病毒能同时感染手机、电脑和旧电视？旧电视连操作系统都没有，怎么运行病毒？这事儿确实邪门。<\/p>"},{"floorLabel":"#16 楼","author":"极客老张","contentHTML":"<p>回复 纯爱战神应声倒地 : 截图发在2楼楼中楼了，自己看。<\/p><p>另外，我刚才用定向天线测了一下信号源，发现这个异常电波的发射源不在小区外面，而是在我们小区内部！信号最强的地方，指向小区地下二层那个废弃了五年的旧配电室！我决定带上设备，下去探秘看看。<\/p>"},{"floorLabel":"#17 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽！废弃配电室？！张哥你别去啊！那种常年不见天日的地方，阴气最重了！你这一去，万一碰到不干净的东西，神仙也救不了你！楼主快跑啊！<\/p>"},{"floorLabel":"#18 楼","author":"乐子人永不眠","contentHTML":"<p>🤪经典恐怖片开局：主角发现信号源在废弃地下室，并决定独自前往。 老张，记得带个手电筒，别带手机，不然等会儿鬼给你打电话。<\/p>"},{"floorLabel":"#19 楼","author":"理工男不秃头","contentHTML":"<p>老张，注意安全！废弃配电室可能有漏电风险，或者积聚了有毒气体。建议你先通知物业，或者带个伴一起去。从科学角度讲，那里可能有人私设了大功率伪基站或者矿机。<\/p>"},{"floorLabel":"#20 楼","author":"极客老张","contentHTML":"<p>回复 理工男不秃头 : 放心，我带了绝缘手套和气体检测仪。物业电话打不通，估计也断网了。我已经到地下二层了，这里很黑，而且……温度异常的高，感觉像进了桑拿房。配电室的门是锁着的，但我能听到里面传来巨大的风扇轰鸣声，像是有什么大型设备在满负荷运转。我准备用液压剪把门弄开。<\/p>"},{"floorLabel":"#21 楼","author":"花开富贵","contentHTML":"<p>阿弥陀佛，菩萨保佑！张哥你别开门啊！里面肯定是镇着什么邪物！你这一开门，放出来就完了！<\/p>"},{"floorLabel":"#22 楼","author":"纯爱战神应声倒地","contentHTML":"<p>😋 越来越有内味了。老张，要是等会儿你拍到一个发光的核心，记得给我发个私信，我出五百块买你的视频。<\/p>"},{"floorLabel":"#23 楼","author":"通信工程狗","contentHTML":"<p>老张？老张你还在吗？怎么十分钟没回复了？楼主别吓我啊，你气体检测仪没报警吧？不行赶紧撤出来！<\/p>"},{"floorLabel":"#24 楼","author":"理工男不秃头","contentHTML":"<p>老张回个话！废弃配电室如果温度异常高，可能是有高压电弧或者短路起火的前兆！别管什么探秘了，赶紧报警吧！打119！<\/p>"},{"floorLabel":"#25 楼","author":"乐子人永不眠","contentHTML":"<p>散了吧散了吧，UP主去异世界了。😅 估计是老张发现里面是某个黑客组织的秘密服务器，被灭口了。明天数码区就要换人更新了，大家记得点个蜡烛。<\/p>"},{"floorLabel":"#26 楼","author":"键盘侠本侠","contentHTML":"<p>你个<strong style=\"color:var(--text-main)\">有没有素质啊？？上网冲浪冲傻了？爹妈白教你了？这种玩笑有那么好开？没听过逝者为大吗，我真是<\/strong>你*了个<strong style=\"color:var(--text-main)\">！<\/strong>**的东西！！<\/p>"}]},{"id":"p_mrm3o9du_5irq","title":"【树洞】爷爷走失半个月了，他留下的旧八音盒突然自己响了，我该怎么办？","titleClean":"爷爷走失半个月了，他留下的旧八音盒突然自己响了，我该怎么办？","category":"树洞","excerpt":"家人们，我现在手都在抖，不知道该怎么形容我现在的心情。我爷爷半个月前因为重病，从医院走失了一直没找到，警察说大概率是……不行了。今天整理他遗","views":4227,"date":"刚刚","opId":"念旧的猫_","floors":[{"floorLabel":"#1 楼","author":"念旧的猫_","contentHTML":"<p>家人们，我现在手都在抖，不知道该怎么形容我现在的心情。我爷爷半个月前因为重病，从医院走失了一直没找到，警察说大概率是……不行了。今天整理他遗物，那个他最宝贝的旧发条八音盒突然自己响了！<\/p><p>最诡异的是，我只要盯着它看，它就转得特别顺畅，音乐也很清晰；但我一转头或者闭上眼，它就卡壳，发出那种“咔咔”的齿轮卡死的声音！我试了好几次，绝壁不是幻觉！是不是爷爷回来看我了？😭<\/p>"},{"floorLabel":"#2 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，楼主快跑……啊不对，这是你亲爷爷！这是头七回魂啊！老爷子执念太深，放心不下你，借着八音盒跟你说话呢。你别怕，多跟他说说话。<\/p>"},{"floorLabel":"#3 楼","author":"纯爱战神应声倒地","contentHTML":"<p>前排吃瓜😋。编，接着编，现在为了水经验连走失的爷爷都拿来编故事了？下一步是不是要卖八音盒了？<\/p>"},{"floorLabel":"#4 楼","author":"理工男不秃头","contentHTML":"<p>楼主别自己吓自己。发条八音盒自己响，是因为内部发条金属疲劳导致的应力释放；盯着看才响，是因为你盯着的时候潜意识给了它微小的震动，或者纯粹是你的视觉和听觉产生了联觉错觉。建议上点润滑油。<\/p>"},{"floorLabel":"#5 楼","author":"花开富贵","contentHTML":"<p>回复 理工男不秃头 : 你这人怎么这么冷血啊！人家小姑娘正伤心呢，你在这扯什么金属疲劳？八音盒自己动，那就是老爷子的魂魄在里头！<\/p>"},{"floorLabel":"#6 楼","author":"念旧的猫_","contentHTML":"<p>回复 理工男不秃头 : 修哥，这八音盒发条早就坏了，根本拧不动的！而且我把它放在玻璃桌上，手都没碰，只要我移开视线它就卡住，这怎么用科学解释啊？我现在真的觉得爷爷就在旁边看着我😢。<\/p>"},{"floorLabel":"#7 楼","author":"观测者_04","contentHTML":"<p>从量子力学角度解释，波函数需要“观测者”进行坍缩，你们不看它，它就不存在。八音盒的发声是因为你的视线提供了宏观观测，迫使处于叠加态的“信息”坍缩成现实。你的关注，正在维持它的存在。<\/p>"},{"floorLabel":"#8 楼","author":"纯爱战神应声倒地","contentHTML":"<p>回复 观测者_04 : 老哥你科幻小说看多了吧，不过有点意思啊。搁这赛博招魂呢？🤪<\/p>"},{"floorLabel":"#9 楼","author":"理工男不秃头","contentHTML":"<p>回复 观测者_04 : 民科你好，量子力学不背这锅。薛定谔的猫要是知道被你们这么用，棺材板都压不住了。<\/p>"},{"floorLabel":"#10 楼","author":"花开富贵","contentHTML":"<p>不管什么波什么数的，就是爷爷想孙女了！妹子，你多看看它，让老爷子安心走吧。<\/p>"},{"floorLabel":"#11 楼","author":"念旧的猫_","contentHTML":"<p>谢谢花姐姐，谢谢观测者老哥。我决定一直盯着这个八音盒，只要我看着，爷爷就还在对不对？我今晚不睡了，我就盯着它。<\/p>"},{"floorLabel":"#12 楼","author":"纯爱战神应声倒地","contentHTML":"<p>好家伙，肝帝啊。为了水经验连觉都不睡了，我敬你是条汉子。<\/p>"},{"floorLabel":"#13 楼","author":"理工男不秃头","contentHTML":"<p>楼主听我一句劝，赶紧去睡觉。熬夜会导致神经衰弱，加重幻听和幻觉。你盯着它看是因为你太思念他了，别把自己身体熬坏了。<\/p>"},{"floorLabel":"#14 楼","author":"念旧的猫_","contentHTML":"<p>回复 理工男不秃头 : 我不睡！我一闭眼它就卡壳了，爷爷会害怕的。我总觉得只要我一直看着，他就能留下来。<\/p>"},{"floorLabel":"#15 楼","author":"花开富贵","contentHTML":"<p>哎哟，看得大妈眼泪都下来了。好孩子，爷爷会心疼你的，看一会儿就睡吧，明天给爷爷烧点纸。<\/p>"},{"floorLabel":"#16 楼","author":"观测者_04","contentHTML":"<p>持续的观测确实能维持叠加态的稳定，但人类的精神力是有限的。当你的注意力涣散，观测强度下降，波函数会重新弥散。它在消耗你的生物电。<\/p>"},{"floorLabel":"#17 楼","author":"纯爱战神应声倒地","contentHTML":"<p>回复 观测者_04 : 虽然听不懂但感觉好牛逼，老哥你这设定一套一套的，不去写网文可惜了。<\/p>"},{"floorLabel":"#18 楼","author":"念旧的猫_","contentHTML":"<p>眼睛好干，眼泪一直流，但是八音盒的声音好像变清晰了……我好像听到爷爷在叫我小名，他让我别哭。<\/p>"},{"floorLabel":"#19 楼","author":"理工男不秃头","contentHTML":"<p>那是干眼症加上极度疲劳产生的幻听！楼主你现在的状态很危险，心跳是不是很快？赶紧去洗把脸躺下！<\/p>"},{"floorLabel":"#20 楼","author":"花开富贵","contentHTML":"<p>是爷爷在跟你说话呢！老爷子，你放心走吧，孙女挺好的，别折腾孩子了！<\/p>"},{"floorLabel":"#21 楼","author":"念旧的猫_","contentHTML":"<p>我不行了，眼皮好重，但我不能闭眼……八音盒转得好快，爷爷的脸好像浮在八音盒上面了，他在笑……（最后回复）<\/p>"},{"floorLabel":"#22 楼","author":"纯爱战神应声倒地","contentHTML":"<p>楼主去睡了吧？别硬撑了，这剧情走向越来越玄幻了。<\/p>"},{"floorLabel":"#23 楼","author":"理工男不秃头","contentHTML":"<p>快停下，你会猝死的！楼主你回个话！不行我帮你报警了，你室友或者家人在不在身边？！<\/p>"},{"floorLabel":"#24 楼","author":"花开富贵","contentHTML":"<p>楼主你别熬了，爷爷会心疼的！快闭眼睡觉吧，听话啊孩子！<\/p>"},{"floorLabel":"#25 楼","author":"纯爱战神应声倒地","contentHTML":"<p>人呢？半小时没动静了。不会真出事了吧？楼主你吱一声啊，别吓我，我胆子小。<\/p>"},{"floorLabel":"#23 楼","author":"Momo","contentHTML":"<p>楼主...楼主应该只是睡着了吧？希望楼主一切安好...🙏🙏🙏<\/p>"}]},{"id":"p_mrm3o9du_kijh","title":"【吐槽】家里监控拍到马赛克黑影，电视半夜自己放戏曲，我快崩溃了！","titleClean":"家里监控拍到马赛克黑影，电视半夜自己放戏曲，我快崩溃了！","category":"吐槽","excerpt":"兄弟们，我最近真的要被折磨疯了。我妈患有重度阿尔茨海默症，上个月从养老院走失，至今没找到。我为了找她，在家里装了智能监控。 结果昨晚半夜，我","views":3976,"date":"刚刚","opId":"老赵不喝酒","floors":[{"floorLabel":"#1 楼","author":"老赵不喝酒","contentHTML":"<p>兄弟们，我最近真的要被折磨疯了。我妈患有重度阿尔茨海默症，上个月从养老院走失，至今没找到。我为了找她，在家里装了智能监控。<\/p><p>结果昨晚半夜，我手机监控报警，我打开一看，客厅里有个诡异扭曲、边缘全是马赛克感的黑影在翻抽屉！而且我家那台老电视，明明拔了插头，居然自己亮起来放我妈最爱听的《铡美案》！我特么当时汗毛都竖起来了，这到底是怎么回事？！<\/p>"},{"floorLabel":"#2 楼","author":"花开富贵","contentHTML":"<p>哎哟，这是老太太的执念啊！她脑子糊涂了，但心里还惦记着家里的东西。那黑影就是老太太的魂，她在找她的老物件呢！<\/p>"},{"floorLabel":"#3 楼","author":"理工男不秃头","contentHTML":"<p>老赵你冷静点。监控拍到马赛克黑影，是因为摄像头红外夜视模块老化，加上光线不足产生的噪点和拖影；电视自己亮，多半是内部电容漏电或者定时开机功能短路。建议换个新摄像头。<\/p>"},{"floorLabel":"#4 楼","author":"纯爱战神应声倒地","contentHTML":"<p>前排吃瓜😋。赛博尽孝是吧？老太太都走失一个月了，还能回来给你唱戏，这监控买得值啊。<\/p>"},{"floorLabel":"#5 楼","author":"老赵不喝酒","contentHTML":"<p>回复 理工男不秃头 : 兄弟，电视插头是我亲眼看着拔下来的，而且插座都没电！那黑影的轮廓，跟我妈平时佝偻着背的样子一模一样，还在翻她以前放存折的抽屉，这怎么解释？<\/p>"},{"floorLabel":"#6 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，拔了插头还亮，这是阴气太重，激发了电器的残存磁场！老哥你家里阴气重，赶紧在门口撒点石灰，或者请个符镇一下！<\/p>"},{"floorLabel":"#7 楼","author":"观测者_04","contentHTML":"<p>监控里的马赛克黑影，是因为波函数尚未完全坍缩。波函数需要“观察者”坍缩，你们不看它，它就不存在。当你通过手机屏幕进行二次观测时，它的形态才会逐渐清晰。电视的声音也是同理，是信息溢出的表现。<\/p>"},{"floorLabel":"#8 楼","author":"纯爱战神应声倒地","contentHTML":"<p>回复 观测者_04 : 虽然听不懂但感觉好牛逼。老哥你这“二次观测”理论绝了，建议去申请诺贝尔物理学奖🤪。<\/p>"},{"floorLabel":"#9 楼","author":"理工男不秃头","contentHTML":"<p>回复 观测者_04 : 别搁这忽悠人了。监控画面有延迟和压缩算法，马赛克纯粹是码率不够导致的伪影，跟量子力学有半毛钱关系？<\/p>"},{"floorLabel":"#10 楼","author":"老赵不喝酒","contentHTML":"<p>我现在一个人坐在卧室里，感觉客厅里一直有人走动，心里发毛。我妈生前脾气就古怪，生病后更是天天骂我，我现在真的很害怕……<\/p>"},{"floorLabel":"#11 楼","author":"花开富贵","contentHTML":"<p>别怕，那是你亲妈，虎毒还不食子呢！你心里默念大悲咒，或者放点佛经，老太太听见就安心了。<\/p>"},{"floorLabel":"#12 楼","author":"纯爱战神应声倒地","contentHTML":"<p>老太太在找存折呢，老赵你赶紧去客厅看看，说不定存折就在抽屉夹层里，找到了老太太就走了😋。<\/p>"},{"floorLabel":"#13 楼","author":"老赵不喝酒","contentHTML":"<p>我受不了了，刚才监控里那黑影突然转头看向摄像头，虽然全是马赛克，但我感觉她在盯着我！我直接把监控电源拔了，眼不见心不烦！<\/p>"},{"floorLabel":"#14 楼","author":"理工男不秃头","contentHTML":"<p>拔了好，这种老旧设备本来就不稳定，自己吓自己。早点休息，明天去派出所问问走失的情况。<\/p>"},{"floorLabel":"#15 楼","author":"观测者_04","contentHTML":"<p>停止观测，它就会重新回到概率云状态，消散在环境中。你拔了监控，切断了观测源，她在这个物理空间的锚点就断了。<\/p>"},{"floorLabel":"#16 楼","author":"花开富贵","contentHTML":"<p>别听他瞎说！拔了监控老太太就找不到家了！老赵你赶紧把监控插上，别让老太太在阴间迷路啊！<\/p>"},{"floorLabel":"#17 楼","author":"老赵不喝酒","contentHTML":"<p>回复 花开富贵 : 大姐你别吓我了行吗？我明天就找人来做法事，这房子我是一天也住不下去了，准备搬出去租个房。<\/p>"},{"floorLabel":"#18 楼","author":"纯爱战神应声倒地","contentHTML":"<p>做法记得开直播，兄弟们给你刷火箭，顺便看看大师能不能把马赛克给去了🤪。<\/p>"},{"floorLabel":"#19 楼","author":"理工男不秃头","contentHTML":"<p>老赵，你最近是不是压力太大了？照顾阿尔茨海默症病人很折磨人，你可能是悲伤和疲劳过度导致的心理幻觉，建议去看看心理医生。<\/p>"},{"floorLabel":"#20 楼","author":"老赵不喝酒","contentHTML":"<p>我特么现在真的听到戏曲声了！就在卧室门外！唱的是“包龙图打坐在开封府”，声音特别尖锐，还伴随着指甲挠门的声音！<\/p>"},{"floorLabel":"#21 楼","author":"花开富贵","contentHTML":"<p>快开门啊！是你妈回来了！她找不到存折着急了，你赶紧开门给她磕个头！<\/p>"},{"floorLabel":"#22 楼","author":"理工男不秃头","contentHTML":"<p>千万别开门！可能是邻居家的电视声音，或者是楼道里的回声。你一个人住，大半夜开门太危险了，万一是贼呢？<\/p>"},{"floorLabel":"#23 楼","author":"观测者_04","contentHTML":"<p>如果你不开门观测，门外的现象就不存在。门挠声只是声波在固体介质中的共振，只要你不去确认，它就无法坍缩成实体。<\/p>"},{"floorLabel":"#24 楼","author":"老赵不喝酒","contentHTML":"<p>我拿扫把和衣柜把门堵死了，今晚死活不出去！爱谁谁，就算是亲妈我也不开门，太邪门了，我明天一早就找搬家公司！<\/p>"},{"floorLabel":"#25 楼","author":"纯爱战神应声倒地","contentHTML":"<p>老赵怂了，散了吧。不过说真的，这挠门声听着挺渗人的，老赵你挺住，天亮了记得发个后续😅。<\/p>"}]},{"id":"p_mrm3o9du_q6sw","title":"【吐槽】绝症哥们失踪后，他的Steam账号半夜上线给我发暗语，盗号狗太缺德了！","titleClean":"绝症哥们失踪后，他的Steam账号半夜上线给我发暗语，盗号狗太缺德了！","category":"吐槽","excerpt":"兄弟们，我特么真的要气炸了！我发小半个月前因为绝症在医院失踪了，大概率是人不行了不想让我们看到。结果今晚半夜，他的Steam账号突然上线了！","views":2042,"date":"刚刚","opId":"峡谷第一亚索","floors":[{"floorLabel":"#1 楼","author":"峡谷第一亚索","contentHTML":"<p>兄弟们，我特么真的要气炸了！我发小半个月前因为绝症在医院失踪了，大概率是人不行了不想让我们看到。结果今晚半夜，他的Steam账号突然上线了！<\/p><p>还给我发消息，发的是我们俩以前开黑时的暗语“上路挂机，下路洗澡”。我上游戏一看，他的角色在地图里疯狂转圈！这特么绝壁是盗号狗，拿死人的号搞恶作剧，太缺德了吧？！<\/p>"},{"floorLabel":"#2 楼","author":"纯爱战神应声倒地","contentHTML":"<p>前排吃瓜😋。盗号狗死妈，连死人的号都盗，这年头工作室为了冲业绩真是什么都干得出来。<\/p>"},{"floorLabel":"#3 楼","author":"花开富贵","contentHTML":"<p>哎哟，小伙子别生气，这是那孩子想你了，上来看看你。头七回魂，他生前最爱打游戏，肯定是舍不得你，虽然大妈我最看不惯孩子玩游戏，但这种情况还是该顺着来啊。<\/p>"},{"floorLabel":"#4 楼","author":"理工男不秃头","contentHTML":"<p>楼主冷静。这可能是Steam云同步的bug，或者他生前把号借给别人、卖给工作室了。暗语可能是他以前在聊天记录里发过，盗号的看了历史记录觉得好玩就复制粘贴了。<\/p>"},{"floorLabel":"#5 楼","author":"峡谷第一亚索","contentHTML":"<p>回复 理工男不秃头 : 兄弟，那暗语是我们俩当面瞎编的，从来没在微信或者QQ里打字发过！盗号的怎么可能知道？而且他角色转圈的速度，根本不是人类手速，跟抽风了一样！<\/p>"},{"floorLabel":"#6 楼","author":"纯爱战神应声倒地","contentHTML":"<p>说不定他生前把号卖给工作室了，工作室用脚本在跑图呢。至于暗语，可能是你记错了，或者他喝醉的时候跟别人说过。<\/p>"},{"floorLabel":"#7 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，角色疯狂转圈，这是鬼打墙啊！你兄弟的魂魄被困在游戏里了，你赶紧上号带他打一局，帮他超度一下！<\/p>"},{"floorLabel":"#8 楼","author":"观测者_04","contentHTML":"<p>他在游戏里的行为是在祈求你的观测。波函数需要“观测者”坍缩，你们不看它，它就不存在。你的关注是他维持数字形态的唯一锚点，转圈是为了引起你的注意。<\/p>"},{"floorLabel":"#9 楼","author":"纯爱战神应声倒地","contentHTML":"<p>回复 观测者_04 : 老哥你科幻小说看多了吧，不过有点意思啊。搁这赛博招魂呢？打个游戏还能打出量子力学来？🤪<\/p>"},{"floorLabel":"#10 楼","author":"理工男不秃头","contentHTML":"<p>回复 观测者_04 : 别扯了，游戏数据就是服务器里的0和1，跟波函数有什么关系？楼主这就是典型的盗号+脚本，直接找客服申诉。<\/p>"},{"floorLabel":"#11 楼","author":"峡谷第一亚索","contentHTML":"<p>气死老子了，我直接上号骂他！管他是不是脚本，敢拿我兄弟的号搞事，老子今天非要把他喷退游！<\/p>"},{"floorLabel":"#12 楼","author":"纯爱战神应声倒地","contentHTML":"<p>前排吃瓜，看楼主对线。记得截图，让兄弟们乐呵乐呵。<\/p>"},{"floorLabel":"#13 楼","author":"峡谷第一亚索","contentHTML":"<p>我骂他“盗号狗死全家”，他只会重复发“救”和“看我”。我让他滚，他就控制角色往我脸上撞，一直发“看我”。这脚本写得还挺智能？<\/p>"},{"floorLabel":"#14 楼","author":"花开富贵","contentHTML":"<p>他在求救啊！你快看看他！他肯定是在下面受苦了，想让你拉他一把，你这孩子怎么还骂他呢！<\/p>"},{"floorLabel":"#15 楼","author":"理工男不秃头","contentHTML":"<p>“救”和“看我”大概率是脚本设定的自动回复关键词。角色往你脸上撞是寻路AI的bug。楼主别入戏太深，改个密码就行了。<\/p>"},{"floorLabel":"#16 楼","author":"观测者_04","contentHTML":"<p>他的数字形态正在衰减，只有你的关注能让他维持存在。他让你“看他”，是在请求你进行宏观观测，否则他的意识数据就会彻底消散。<\/p>"},{"floorLabel":"#17 楼","author":"峡谷第一亚索","contentHTML":"<p>放屁！老子今天非要把这盗号狗封了！还意识数据，你当这是《黑客帝国》呢？我兄弟要是真在天有灵，能大半夜搞这种阴间操作吓我？<\/p>"},{"floorLabel":"#18 楼","author":"纯爱战神应声倒地","contentHTML":"<p>楼主别骂了，万一对面真是你兄弟，多伤心啊。你就当陪他玩会儿呗，反正大半夜的也没事干。<\/p>"},{"floorLabel":"#19 楼","author":"峡谷第一亚索","contentHTML":"<p>他要是真我兄弟，能大半夜搞这种阴间操作？我兄弟生前最体面了，绝不可能变成这种只会发“救”的弱智脚本！这绝壁是盗号狗在恶心我！<\/p>"},{"floorLabel":"#20 楼","author":"花开富贵","contentHTML":"<p>孩子，万一是他有什么未了的心愿呢？你问问他想要什么，帮他办了，他自然就走了。<\/p>"},{"floorLabel":"#21 楼","author":"理工男不秃头","contentHTML":"<p>建议立刻改密码，开启手机令牌，并把这台电脑杀毒。跟脚本对骂只会浪费你的时间。<\/p>"},{"floorLabel":"#22 楼","author":"峡谷第一亚索","contentHTML":"<p>改不了了！提示设备异常，他那边一直在顶我号！我刚改完密码，一秒钟就被挤下来了，这盗号狗手里有我的原始注册信息！<\/p>"},{"floorLabel":"#23 楼","author":"观测者_04","contentHTML":"<p>他在拼命抓住最后的观测锚点。你一旦下线或者拒绝观测，他就彻底消失了。这是数字生命最后的挣扎。<\/p>"},{"floorLabel":"#24 楼","author":"峡谷第一亚索","contentHTML":"<p>消失就消失！老子最烦这种装神弄鬼的盗号狗！我刚才直接打客服电话，提供了所有充值记录和身份证，申请强制注销账号！老子让你盗，连号带人一起扬了！<\/p>"},{"floorLabel":"#25 楼","author":"纯爱战神应声倒地","contentHTML":"<p>卧槽，楼主是个狠人，赛博超度了属于是。😅 盗号狗估计都懵了，这单生意亏到姥姥家了。散了吧散了吧。<\/p>"}]},{"id":"p_mrm3o9du_rcl8","title":"【求助】我老婆半年前车祸走了，今晚她的旧手机突然给我发短信……","titleClean":"我老婆半年前车祸走了，今晚她的旧手机突然给我发短信……","category":"求助","excerpt":"兄弟们，我现在手抖得连字都打不利索。我老婆半年前出车祸走了，她的旧手机我一直放在床头柜上充着电，当个念想。就在刚才凌晨两点，那手机突然亮了，","views":2239,"date":"刚刚","opId":"等风也等她_","floors":[{"floorLabel":"#1 楼","author":"等风也等她_","contentHTML":"<p>兄弟们，我现在手抖得连字都打不利索。我老婆半年前出车祸走了，她的旧手机我一直放在床头柜上充着电，当个念想。就在刚才凌晨两点，那手机突然亮了，收到一条短信：“我在这里，好冷，来找我。”<\/p><p>下面还附带了一个定位，在腾岳市北郊那个废弃的化工厂！我试了无数次，那手机明明没插SIM卡啊！这到底是怎么回事？是不是她在那边太冷了，想让我去陪她？😭<\/p>"},{"floorLabel":"#2 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，楼主节哀！这是嫂子头七……不对，半年了，这是执念太深回魂了啊！她一个人在这边害怕，你赶紧买点是纸钱，去那个定位给她烧点，顺便见最后一面。<\/p>"},{"floorLabel":"#3 楼","author":"纯爱战神应声倒地","contentHTML":"<p>前排吃瓜😋。编，接着编，没插卡怎么收短信？现在为了水经验连死去的媳妇都拿来编故事了？下一步是不是要直播探险了？<\/p>"},{"floorLabel":"#4 楼","author":"华强北修哥","contentHTML":"<p>楼主冷静点，别自己吓自己。没插卡收短信，大概率是手机中了木马病毒，或者连了附近的伪基站。那个定位是病毒后台自动生成的钓鱼链接，千万别点，更别去！<\/p>"},{"floorLabel":"#5 楼","author":"花开富贵","contentHTML":"<p>回复 华强北修哥 : 你这人怎么这么冷血啊！人家老公正伤心呢，你在这扯什么病毒？没插卡能收短信，那就是阴间的信号！楼主听大妈的，去看看她吧，别让她成了孤魂野鬼。<\/p>"},{"floorLabel":"#6 楼","author":"等风也等她_","contentHTML":"<p>回复 华强北修哥 : 修哥，我刚才把手机连上电脑查了，没有中病毒的迹象。而且那短信的发送号码，就是她生前用的那个号码！这怎么解释？我现在满脑子都是她出车祸时的样子，我觉得她真的在等我。<\/p>"},{"floorLabel":"#7 楼","author":"水贴小能手","contentHTML":"<p>经验+3，告辞。楼主记得开直播，兄弟们给你刷火箭。<\/p>"},{"floorLabel":"#8 楼","author":"观测者_04","contentHTML":"<p>这是信息态的诱捕。数字生命在模仿逝者的行为逻辑，构建虚假坐标。不要去，那是同化陷阱！<\/p>"},{"floorLabel":"#9 楼","author":"纯爱战神应声倒地","contentHTML":"<p>回复 观测者_04 : 老哥又出来装逼了？还“信息态诱捕”，你当这是《黑客帝国》呢？不过你这设定一套一套的，不去写网文可惜了🤪。<\/p>"},{"floorLabel":"#10 楼","author":"理工男不秃头","contentHTML":"<p>回复 观测者_04 : 虽然你每次都说得很玄乎，但这次我站你。楼主，从技术角度讲，旧手机基站信息缓存或者iCloud云端同步延迟，都可能导致这种假象。千万别去北郊，那边连路灯都没有，大半夜去太危险了！<\/p>"},{"floorLabel":"#11 楼","author":"等风也等她_","contentHTML":"<p>我不管什么陷阱不陷阱的，哪怕只有万分之一的可能是她，我也要去看看。我已经拿上车钥匙出门了，北郊废弃化工厂是吧？我这就开车过去。<\/p>"},{"floorLabel":"#12 楼","author":"花开富贵","contentHTML":"<p>好孩子，去吧，路上慢点开。记得带件厚衣服，嫂子说冷，你去了抱抱她。<\/p>"},{"floorLabel":"#13 楼","author":"华强北修哥","contentHTML":"<p>楼主你疯了吗？！大半夜去废弃化工厂？你赶紧回来！我已经帮你打110了，警察说会去那个定位看看，你千万别自己过去，那边地形复杂，容易出人命！<\/p>"},{"floorLabel":"#14 楼","author":"纯爱战神应声倒地","contentHTML":"<p>卧槽，真去了？这剧本演得挺真啊。楼主注意安全，别真被传销团伙给嘎了腰子😅。<\/p>"},{"floorLabel":"#15 楼","author":"水贴小能手","contentHTML":"<p>插眼，等后续。希望楼主平安归来。<\/p>"},{"floorLabel":"#16 楼","author":"等风也等她_","contentHTML":"<p>我已经开到北郊了，这边雾好大，路灯全坏了。手机信号只剩一格了。奇怪，越靠近那个化工厂，我手里的旧手机就越烫，而且屏幕一直闪那种雪花点。我好像看到厂区门口有个穿白衣服的影子……是她吗？<\/p>"},{"floorLabel":"#17 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽！白衣服？楼主你别过去啊！那是煞气聚顶！赶紧掉头，把车窗摇上去，放点大悲咒！<\/p>"},{"floorLabel":"#18 楼","author":"理工男不秃头","contentHTML":"<p>快报警啊！他最后说没信号了！楼主你别管什么白衣服了，可能是废弃厂区的塑料布被风吹的！赶紧下车往大路上跑！<\/p>"},{"floorLabel":"#19 楼","author":"观测者_04","contentHTML":"<p>你的观测正在被反向利用，切断观测链！<\/p>"},{"floorLabel":"#20 楼","author":"纯爱战神应声倒地","contentHTML":"<p>回复 观测者_04 : 老哥你这话说得我汗毛都竖起来了。楼主你听他的，赶紧跑吧，别真把命搭进去了。<\/p>"},{"floorLabel":"#21 楼","author":"等风也等她_","contentHTML":"<p>我走到门口了，那个影子转过头了……真的是她！她在对我笑，她叫我过去。手机没信号了，我……（最后回复）<\/p>"},{"floorLabel":"#22 楼","author":"华强北修哥","contentHTML":"<p>快报警啊！他最后说没信号了！我已经帮他打110了，报了他说的定位，希望来得及。<\/p>"},{"floorLabel":"#23 楼","author":"花开富贵","contentHTML":"<p>楼主你别吓我，赶紧回个话啊！嫂子，你放过你老公吧，让他回家吧！<\/p>"},{"floorLabel":"#24 楼","author":"纯爱战神应声倒地","contentHTML":"<p>他真去了？不会出人命吧？这大半夜的，我看着屏幕都觉得后背发凉。<\/p>"},{"floorLabel":"#25 楼","author":"理工男不秃头","contentHTML":"<p>警察已经出警了，大家别水贴了，保持安静，等警方的通报。楼主千万别出事啊！<\/p>"}]},{"id":"p_mrm3o9du_nm20","title":"【吐槽】两年前溺水的弟弟，他的平板半夜自动画画，画了个阴间建筑！","titleClean":"两年前溺水的弟弟，他的平板半夜自动画画，画了个阴间建筑！","category":"吐槽","excerpt":"各位吧友，我遇到件极其邪门的事。我弟弟两年前在腾岳市水库溺水走了，他的平板电脑我一直放在书房抽屉里没动过。今晚我加班，那平板突然自己亮屏了，","views":8126,"date":"刚刚","opId":"理智的破壁人","floors":[{"floorLabel":"#1 楼","author":"理智的破壁人","contentHTML":"<p>各位吧友，我遇到件极其邪门的事。我弟弟两年前在腾岳市水库溺水走了，他的平板电脑我一直放在书房抽屉里没动过。今晚我加班，那平板突然自己亮屏了，还自动打开画图软件开始画画！<\/p><p>画的全是那种密密麻麻的几何线条，最后拼成一个极其复杂的奇怪建筑物，而且建筑物右下角的一个区域一直在闪烁红光！我特么当时冷汗就下来了，这绝对是黑客远程控屏恶作剧吧？<\/p>"},{"floorLabel":"#2 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，弟弟托梦啊！他在水底冷，想让你给他烧点纸钱。那画的是阴曹地府的图纸吧？赶紧找个大师给看看！<\/p>"},{"floorLabel":"#3 楼","author":"华强北修哥","contentHTML":"<p>楼主别慌，这百分之百是中了木马病毒。平板长时间不关机连网，很容易被黑客当成肉鸡。远程控屏画图是黑客在测试屏幕触控IC，闪烁红光是在测试坏点。建议立刻断网并恢复出厂设置。<\/p>"},{"floorLabel":"#4 楼","author":"纯爱战神应声倒地","contentHTML":"<p>前排吃瓜😋。黑客大半夜不睡觉，控一个死人的平板画画？这黑客是有多闲？楼主你是不是得罪什么人了？<\/p>"},{"floorLabel":"#5 楼","author":"理智的破壁人","contentHTML":"<p>回复 华强北修哥 : 修哥，我刚才已经把Wi-Fi和蓝牙全关了，甚至把路由器都拔了！但那平板还在画！而且那几何线条越看越眼熟，不像是乱画的，像是某种工程图纸。<\/p>"},{"floorLabel":"#6 楼","author":"水贴小能手","contentHTML":"<p>经验+3，楼主记得把图截下来发出来让大家开开眼。<\/p>"},{"floorLabel":"#7 楼","author":"观测者_04","contentHTML":"<p>那不是画，那个几何建筑在向你的大脑植入空间坐标模因。<\/p>"},{"floorLabel":"#8 楼","author":"纯爱战神应声倒地","contentHTML":"<p>回复 观测者_04 : 老哥你这“空间坐标模因”绝了，拿量子力学解释灵异真是头一个。不过这次我居然觉得有点道理，那图确实挺邪门的。<\/p>"},{"floorLabel":"#9 楼","author":"理工男不秃头","contentHTML":"<p>回复 观测者_04 : 别扯淡了，什么高维投影。楼主，平板断网还能画图，说明是本地缓存的脚本在运行，或者是主板短路导致屏幕乱触。你仔细看看那建筑，是不是像你们当地的什么烂尾楼？<\/p>"},{"floorLabel":"#10 楼","author":"花开富贵","contentHTML":"<p>不管是啥，弟弟的东西自己动了，就是弟弟想哥哥了。楼主你多跟他说说话，别让他一个人孤单。<\/p>"},{"floorLabel":"#11 楼","author":"理智的破壁人","contentHTML":"<p>我刚才把画截图放大看了一下，那个闪烁红光的区域，放大后里面有一行极小的像素字，写着，什么研究所B区。我查了一下地图，北郊确实有个废弃的研究所，但这跟我弟弟有什么关系？<\/p>"},{"floorLabel":"#12 楼","author":"华强北修哥","contentHTML":"<p>这就实锤是黑客恶作剧了！黑客查了你的个人信息，故意搞这种恶作剧吓你。那个研究所估计是黑客随便编的坐标，或者是个非法传销窝点，千万别去！<\/p>"},{"floorLabel":"#13 楼","author":"纯爱战神应声倒地","contentHTML":"<p>黑客：惊不惊喜，意不意外？ 楼主：我惊你大爷。🤪<\/p>"},{"floorLabel":"#14 楼","author":"茅山小王_接急单","contentHTML":"<p>废弃研究所？听起来就危险！楼主你弟弟是不是在那边受过什么委屈？赶紧去庙里给他超度一下，别让他被脏东西控制了。<\/p>"},{"floorLabel":"#15 楼","author":"水贴小能手","contentHTML":"<p>插眼，等楼主去北郊探险，记得开直播。<\/p>"},{"floorLabel":"#16 楼","author":"观测者_04","contentHTML":"<p>不是恶作剧，千万别过去。<\/p>"},{"floorLabel":"#17 楼","author":"理工男不秃头","contentHTML":"<p>楼主，那个研究所确实听起来很邪门。我建议你立刻把平板锁进抽屉，明天找个电脑店把硬盘拆了。千万别去北郊，这种废弃研究所可能有辐射或者危房风险。<\/p>"},{"floorLabel":"#18 楼","author":"花开富贵","contentHTML":"<p>别锁啊，弟弟会闷的！你把它供起来，每天上柱香，弟弟就安息了。<\/p>"},{"floorLabel":"#19 楼","author":"纯爱战神应声倒地","contentHTML":"<p>黑客估计懵了，画了半天图被关小黑屋了🤣。楼主干得漂亮，别去送人头。<\/p>"},{"floorLabel":"#20 楼","author":"理智的破壁人","contentHTML":"<p>我越想越后怕，刚才看着那闪烁的红光，我居然有一种想立刻开车去北郊的冲动，脑子里一直有个声音在催我。我已经把平板关机，锁进书房最底层的抽屉里了，还拿胶带封死了。明天一早就找人砸了它。<\/p>"},{"floorLabel":"#21 楼","author":"华强北修哥","contentHTML":"<p>干得漂亮，明天找个电脑店把平板刷机，或者直接物理销毁。这种带心理暗示的恶作剧最恶心了。<\/p>"},{"floorLabel":"#22 楼","author":"花开富贵","contentHTML":"<p>哎，锁起来也行，眼不见心不烦。楼主今晚早点睡，别想太多了。<\/p>"},{"floorLabel":"#23 楼","author":"纯爱战神应声倒地","contentHTML":"<p>黑客：我精心设计的模因污染，你就给我锁抽屉里？😅<\/p>"},{"floorLabel":"#24 楼","author":"水贴小能手","contentHTML":"<p>经验+3，告辞。楼主是个狠人，说锁就锁。<\/p>"}]},{"id":"p_mrm3o9du_gbvv","title":"【直播】我妈三个月前病逝，刚才她微信发语音让我去接她，我正在路上！","titleClean":"我妈三个月前病逝，刚才她微信发语音让我去接她，我正在路上！","category":"直播","excerpt":"家人们，我快要疯了。我妈三个月前因病去世，她的微信号我一直留着没删。就在十分钟前，她突然给我发了一条语音，声音特别虚弱，说：“囡囡，来接我，","views":7008,"date":"刚刚","opId":"妈妈的小棉袄","floors":[{"floorLabel":"#1 楼","author":"妈妈的小棉袄","contentHTML":"<p>家人们，我快要疯了。我妈三个月前因病去世，她的微信号我一直留着没删。就在十分钟前，她突然给我发了一条语音，声音特别虚弱，说：“囡囡，来接我，妈好怕。”<\/p><p>然后还分享了一个定位。我不管是不是诈骗，听到我妈的声音我根本控制不住自己，我已经打车在去北郊的路上了，开帖直播！<\/p>"},{"floorLabel":"#2 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，阿姨回魂了！妹子你别怕，妈不会害女儿的，你赶紧去接她，记得带件厚外套！<\/p>"},{"floorLabel":"#3 楼","author":"华强北修哥","contentHTML":"<p>楼主快停车！这绝对是AI语音合成诈骗！现在AI克隆声音技术太成熟了，骗子利用你母亲的微信发定位，想把你骗到偏僻地方绑架！赶紧让司机掉头，打110！<\/p>"},{"floorLabel":"#4 楼","author":"纯爱战神应声倒地","contentHTML":"<p>前排吃瓜😋。大半夜接死去的妈？这剧本太阴间了，楼主你心真大。<\/p>"},{"floorLabel":"#5 楼","author":"妈妈的小棉袄","contentHTML":"<p>回复 华强北修哥 : 修哥，那语音里的背景音，有我妈生前最喜欢听的那个老座钟的滴答声，那个钟早就坏了，骗子怎么可能知道？而且我听到我妈的声音，心里特别难受，我必须去确认一下。<\/p>"},{"floorLabel":"#6 楼","author":"水贴小能手","contentHTML":"<p>经验+3，楼主注意安全，随时更新。<\/p>"},{"floorLabel":"#7 楼","author":"花开富贵","contentHTML":"<p>就是啊，知女莫若母，妈想女儿了。妹子你别听他们的，去接你妈，别让她在荒郊野外的等急了。<\/p>"},{"floorLabel":"#8 楼","author":"理工男不秃头","contentHTML":"<p>楼主你清醒一点！座钟滴答声可以是音效库里的素材！你一个大半夜去太危险了！快让司机停车！<\/p>"},{"floorLabel":"#9 楼","author":"妈妈的小棉袄","contentHTML":"<p>家人们，车开到北郊了，这边突然起了好大的雾，白茫茫的一片，车灯都照不远。而且司机的导航突然失灵了，一直在原地转圈，提示“偏离路线”。<\/p>"},{"floorLabel":"#10 楼","author":"纯爱战神应声倒地","contentHTML":"<p>起雾+导航失灵，经典恐怖片桥段。楼主你现在跳车还来得及😅。<\/p>"},{"floorLabel":"#11 楼","author":"观测者_04","contentHTML":"<p>立刻头！你在驶叠加边缘区域，雾气是概在现实中的宏！的母亲已被，她在用情鸣诱导你进！<\/p>"},{"floorLabel":"#12 楼","author":"华强北修哥","contentHTML":"<p>回复 观测者_04 : 老哥你别吓她了！楼主，雾气是夜间辐射降温导致的平流雾，导航失灵是因为废弃地区基站信号弱。但不管怎样，大雾天行车太危险，赶紧靠边停车！<\/p>"},{"floorLabel":"#13 楼","author":"妈妈的小棉袄","contentHTML":"<p>车停不下来了！司机说刹车有点失灵，而且车里的收音机突然自己打开了，全是滋滋的电流声……等等，电流声里好像有我妈的声音，她在叫我的小名，让我往前走……<\/p>"},{"floorLabel":"#14 楼","author":"花开富贵","contentHTML":"<p>是妈妈在叫你！妹子你别怕，顺着声音走，妈在等你呢！<\/p>"},{"floorLabel":"#15 楼","author":"水贴小能手","contentHTML":"<p>卧槽，这直播太刺激了，插眼保命。<\/p>"},{"floorLabel":"#16 楼","author":"理工男不秃头","contentHTML":"<p>快掉头！收音机串频了！那是附近电台的干扰！司机刹车失灵可能是大雾导致路面湿滑，你赶紧拉手刹，或者让司机挂低档位减速！千万别顺着声音走！<\/p>"},{"floorLabel":"#17 楼","author":"妈妈的小棉袄","contentHTML":"<p>雾越来越浓了，我连车窗外都看不清了。手机电量突然从80%掉到了10%，屏幕一直在闪。那个定位显示还有不到一公里就到了……我好像看到雾里有个建筑物的轮廓，好大，全是那种奇怪的几何线条。<\/p>"},{"floorLabel":"#18 楼","author":"茅山小王_接急单","contentHTML":"<p>那是阴曹地府的入口啊！妹子你赶紧下车跑，别进那个建筑，进去就出不来了！<\/p>"},{"floorLabel":"#19 楼","author":"纯爱战神应声倒地","contentHTML":"<p>这剧本太真了，我看得都起鸡皮疙瘩了。楼主你别演了，赶紧回家睡觉吧，大半夜的。<\/p>"},{"floorLabel":"#20 楼","author":"华强北修哥","contentHTML":"<p>最后警告，跳车！哪怕摔伤也比进那个鬼地方强！那个建筑绝对是废弃研究所的主体，里面可能有高压电或者有毒气体！<\/p>"},{"floorLabel":"#21 楼","author":"观测者_04","contentHTML":"<p>停下！那字模染！不去个标，那[数据删除]！<\/p>"},{"floorLabel":"#22 楼","author":"理工男不秃头","contentHTML":"<p>楼上发了什么？怎么被屏蔽了？[数据删除]是个啥？研究所？什么鬼？<\/p>"},{"floorLabel":"#23 楼","author":"纯爱战神应声倒地","contentHTML":"<p>你这用户太令人印象深刻了，拿量子力学解释灵异真是头一个，但现在似乎我都有点信你了。楼主快听他的，别进去！<\/p>"},{"floorLabel":"#24 楼","author":"花开富贵","contentHTML":"<p>这人说话太神了，连系统都屏蔽他！楼主快听他的，快掉头啊，别去接你妈了！<\/p>"},{"floorLabel":"#25 楼","author":"管理","contentHTML":"<p>【系统提示：该帖子因违反吧规/涉及敏感信息，已被管理员修改封禁】<\/p>"}]},{"id":"p_mrm3o9du_l665","title":"【求助】我发小的女朋友一个月前突然失踪了，他现在魔怔了，救救孩子吧...","titleClean":"我发小的女朋友一个月前突然失踪了，他现在魔怔了，救救孩子吧...","category":"求助","excerpt":"吧友们帮帮忙，我实在没招了。我铁哥们（叫他大伟吧）的女朋友，刚好一个月前突然人没了。那天是周末，本来是约定好的双方个人时间，但大伟等到第二天","views":3936,"date":"刚刚","opId":"热心市民老王_","floors":[{"floorLabel":"#1 楼","author":"热心市民老王_","contentHTML":"<p>吧友们帮帮忙，我实在没招了。我铁哥们（叫他大伟吧）的女朋友，刚好一个月前突然人没了。那天是周末，本来是约定好的双方个人时间，但大伟等到第二天都没见她回家，消息电话一个不接！报警了，监控也没拍到她的动向。现在大伟像失了魂一样，班也不上了，天天满大街贴寻人启事，整个人瘦脱相了。大家有没有什么寻人的好办法？或者教教我怎么骂醒他，再这样下去他身体真要垮了😟<\/p>"},{"floorLabel":"#2 楼","author":"理智的破壁人","contentHTML":"<p>报警查监控是第一步，然后去查她的银行卡流水、微信支付宝消费记录、医保卡使用记录。只要人活着，在现代城市里不可能不留痕迹。<\/p>"},{"floorLabel":"#3 楼","author":"纯爱战神应声倒地","contentHTML":"<p>前排吃瓜😋。楼主你先别急，确定两人没吵架？现在很多小年轻吵架，女的故意不回消息玩失踪，就是想冷暴力男方，等男方急得像热锅上的蚂蚁她再出现。<\/p>"},{"floorLabel":"#4 楼","author":"茅山小王_接急单","contentHTML":"<p>卧槽，监控都没记录，这绝壁是撞邪了啊！或者被迷晕拐卖了。楼主让你哥们赶紧找个靠谱的大仙算一卦，看看人在哪个方位，别瞎找了。<\/p>"},{"floorLabel":"#5 楼","author":"乐子人永不眠","contentHTML":"<p>😅 楼主你真是皇帝不急太监急。说不定大伟心里正想着“终于分了，可以换下一个了”，你在这急得跳脚。听哥一句劝，放下助人情结，尊重他人命运。<\/p>"},{"floorLabel":"#6 楼","author":"理工男不秃头","contentHTML":"<p>回复 纯爱战神应声倒地 : 同意。另外，如果女方是从事某些高压工作的，有可能是心理压力太大，自己找个地方躲起来清静了。建议楼主去女方单位打听打听她最近的工作状态。<\/p>"},{"floorLabel":"#7 楼","author":"热心市民老王_","contentHTML":"<p>回复 纯爱战神应声倒地 : 扯犊子呢！他俩感情好得跟一个人似的，大伟平时连句重话都不敢跟她说，女方更是温柔得不得了，处处替别人着想，绝不可能玩离家出走这种幼稚把戏！<\/p>"},{"floorLabel":"#8 楼","author":"热心市民老王_","contentHTML":"<p>回复 理工男不秃头 : 她单位我陪大伟去过了。人家可是拿过市级杰出青年基金的科研大佬，智商情商双高，在单位人缘可好了，项目正到关键期，怎么可能一声不吭躲起来？单位那边也说没任何异常。<\/p>"},{"floorLabel":"#9 楼","author":"纯爱战神应声倒地","contentHTML":"<p>卧槽？市级杰青？这么牛逼的大佬？那确实不可能玩失踪了。这种级别的人才，警方应该会很重视吧？没立案吗？<\/p>"},{"floorLabel":"#10 楼","author":"热心市民老王_","contentHTML":"<p>回复 纯爱战神应声倒地 : 立了，刑警队都介入了。但就是邪门，她周末常去的咖啡厅图书馆什么的，都没记录到她丝毫身影。警察也没辙，只能等线索。<\/p>"},{"floorLabel":"#11 楼","author":"热心市民老王_","contentHTML":"<p>更新一下现状吧，刚去大伟家看了他，真让人心疼。家里还保持着她走之前的样子，拖鞋摆在门口，胶片也仍是她那天放的那首，桌上他俩最喜欢的手工再也没放回工具盒。<\/p>"},{"floorLabel":"#12 楼","author":"花开富贵","contentHTML":"<p>哎哟，造孽啊！这小伙子太深情了。这是中邪了，被脏东西迷了心窍。你赶紧带他去趟北郊的青山寺，求个平安符，再让大师给做个法事，驱驱邪气！<\/p>"},{"floorLabel":"#13 楼","author":"理工男不秃头","contentHTML":"<p>别搞封建迷信那一套了！他这是典型的创伤后应激障碍（PTSD）加上重度抑郁倾向。楼主你别顺着他，强行带他去市三院看心理医生，再这么下去他精神要出大问题。<\/p>"},{"floorLabel":"#14 楼","author":"热心市民老王_","contentHTML":"<p>回复 理工男不秃头 : 劝过啊，他不肯去，一说看医生他就急眼。那天半夜我起夜，听到他坐在客厅沙发上，看着女方的照片掉眼泪，一边哭一边小声念叨...听得我眼泪都下来了😭<\/p>"},{"floorLabel":"#15 楼","author":"乐子人永不眠","contentHTML":"<p>😟 虽然平时爱开玩笑，但这哥们确实是个情种。现在这社会，这么深情的人不多了。楼主你这段时间多去陪陪他，拉他出去喝喝酒、打打球，别让他一个人闷着。<\/p>"},{"floorLabel":"#16 楼","author":"热心市民老王_","contentHTML":"<p>回复 乐子人永不眠 : 我就是天天去陪他啊，但他现在除了找人不干别的。今天看他眼窝深陷，头发大把大把地掉，我是真怕他哪天突然就猝死了。这日子什么时候是个头啊。<\/p>"},{"floorLabel":"#17 楼","author":"花开富贵","contentHTML":"<p>菩萨保佑，这么善良的女孩，这么深情的小伙子，老天爷不长眼啊！希望早点有消息吧，大妈明天去庙里给他们俩上个香。<\/p>"},{"floorLabel":"#18 楼","author":"吃瓜不吐皮","contentHTML":"<p>说起来挺邪门的，不知道你们发没发现，最近这一个月咱们市里的怪事/灵异现象好像特别多？我看好几个帖子里都在说电器闹鬼、监控拍到黑影什么的。<\/p>"},{"floorLabel":"#19 楼","author":"键盘侠本侠","contentHTML":"<p>对对对！我也感觉到了！就这一个月，我小区群天天有人抱怨智能家居发疯，去庙里上香的人都变多了，感觉这一个月阴气好重啊……该不会是真的有什么大事要发生吧？😅<\/p>"},{"floorLabel":"#20 楼","author":"热心市民老王_","contentHTML":"<p>回复 键盘侠本侠 : 你别说，大伟也跟我提过，说最近晚上总觉得家里电器有电流声，像有人在喘气。我现在也是心里发毛，这一个月确实太邪门了……不管咋样，只求我哥们能挺过这一关，那个女孩能平安回来吧。<\/p>"},{"floorLabel":"#21 楼","author":"观测者+4","contentHTML":"<p>hewjcveuwjfeqoqk，fewskseatejLHITO1998<\/p>"},{"floorLabel":"#22 楼","author":"纯爱战神应声倒地","contentHTML":"<p>好熟悉的id...观察者老弟，这是你的小号？+4？这些字母又是啥意思啊？咋了这是，大号封了话都说不明白了？<\/p>"}]}];window.__PRELOADED_COLORS__={"观测者_04":"#000000","软糖不软_":"hsl(143, 59%, 40%)","茅山小王_接急单":"hsl(282, 46%, 46%)","纯爱战神应声倒地":"hsl(89, 52%, 44%)","华强北修哥":"hsl(152, 39%, 39%)","花开富贵":"hsl(34, 43%, 42%)","乐子人永不眠":"hsl(80, 39%, 46%)","理工男不秃头":"hsl(57, 49%, 48%)","键盘侠本侠":"hsl(213, 38%, 43%)","腾岳老李代驾":"hsl(53, 49%, 44%)","秋名山五菱宏光":"hsl(150, 52%, 42%)","汽修厂大拿":"hsl(262, 49%, 40%)","极客老张":"hsl(82, 35%, 40%)","通信工程狗":"hsl(52, 53%, 44%)","念旧的猫_":"hsl(19, 54%, 39%)","Momo":"hsl(275, 41%, 44%)","老赵不喝酒":"hsl(299, 53%, 49%)","峡谷第一亚索":"hsl(299, 48%, 40%)","等风也等她_":"hsl(162, 41%, 47%)","水贴小能手":"hsl(122, 56%, 44%)","理智的破壁人":"hsl(156, 37%, 43%)","妈妈的小棉袄":"hsl(113, 46%, 39%)","管理":"hsl(299, 49%, 47%)","热心市民老王_":"hsl(20, 50%, 38%)","吃瓜不吐皮":"hsl(330, 41%, 39%)","观测者+4":"hsl(301, 38%, 47%)"};window.__PRELOADED_CATS__={"树洞":26,"吐槽":218,"探究":231,"求助":40,"直播":151};</script>
+
+<!-- 全局特效层 -->
+<div class="ghost-layer" id="ghostLayer"></div>
+<div class="fx-scanlines"></div>
+<div class="fx-vignette"></div>
+
+<!-- 轻提示 Toast -->
+<div class="toast" id="toast">欢迎管理员登入</div>
+
+<!-- ============ 视图1：登录页 ============ -->
+<section class="view active" id="view-login">
+    <div class="login-card">
+        <div class="login-title">深渊论坛</div>
+        <div class="login-sub">ABYSS · 亡者亦在此栖息</div>
+        <div class="field">
+            <label>用户名</label>
+            <input type="text" id="inpUser" placeholder="你的名字，将被记住…" maxlength="20" autocomplete="off">
+        </div>
+        <div class="field">
+            <label>密码</label>
+            <input type="password" id="inpPass" placeholder="············" maxlength="30" autocomplete="off">
+        </div>
+        <button class="btn-enter" id="btnEnter">踏入深渊</button>
+        <div class="login-warn">
+            <span class="blink">⚠ 警告</span><br>
+            本论坛记录的每一次访问都无法删除。<br>
+            当你读到这行字时，你的名字已被<span class="blink">登记</span>。<br>
+            未满18岁，或心脏不佳者，请立即离开。
+        </div>
+    </div>
+</section>
+
+<!-- ============ 视图2：论坛列表页 ============ -->
+<section class="view" id="view-list">
+    <header class="site-header">
+        <div class="site-logo" id="logoHome">深渊论坛</div>
+        <div class="header-right">
+            <span class="online-count" id="onlineBox">当前在线：<b id="onlineNum">646</b> 人</span>
+            <span class="cur-user" id="curUserBox">亡魂 · 管理员</span>
+            <button class="btn-logout" id="btnLogout">离开</button>
+        </div>
+    </header>
+    <div class="container">
+        <!-- 公告栏 -->
+        <div class="notice">
+            <div class="notice-title">▌管理员公告</div>
+            本版块所有故事均由用户"亲身经历"投稿。若你在帖子里看到了熟悉的名字、住址或电话，
+            请不要惊慌——那只是巧合。<span class="creepy-text">大概。</span>
+            另：昨夜 03:07 有一位未注册用户发布了 14 篇帖子，现已全部删除，发布者账号<span class="creepy-text">查无此人</span>。
+        </div>
+
+        <!-- 解析器面板（仅管理员可见） -->
+        <div class="parser-panel" id="parserPanel" style="display: none;">
+            <div class="parser-head" id="parserToggle">
+                <span>▛ 招魂阵 · 帖子解析器</span>
+                <span class="toggle" id="parserToggleTxt">[ 收起 ]</span>
+            </div>
+            <div class="parser-body open" id="parserBody">
+                <textarea id="parserInput" placeholder="在此粘贴符合格式的帖子文本，点击「招魂」自动生成帖子…"></textarea>
+                <div class="parser-actions">
+                    <button class="btn-parse" id="btnParse">招 魂</button>
+                    <button class="btn-parse" id="btnParseDemo" style="background:linear-gradient(180deg,#1a1a1a,#2a2a2a);border-color:var(--border-soft);">载入示例</button>
+                    <button class="btn-parse" id="btnExport" style="background:linear-gradient(180deg,#12210f,#243a1c);border-color:#3a5a3a;">导出为网页</button>
+                    <span class="parse-msg ok" id="parseMsg">✔ 招魂成功，新增 10 篇帖子（共 248 层）。</span>
+                </div>
+                <div class="parser-hint" id="parserHint">【招魂格式】
+==============================
+**帖子N：标题文字**
+==============================
+
+**1楼**
+**ID：用户名**
+正文……（空行分段）
+&gt; 行首加 &gt; 变成引用块
+[恐怖]被此标记包裹的文字会暗红发光[/恐怖]
+
+**2楼**
+**ID：另一位**
+回复内容……</div>
+            </div>
+        </div>
+
+        <div class="section-bar">
+            <h2>亡魂低语</h2>
+        </div>
+        <div id="postList"><div class="post-card">
+            <span class="post-cat" style="color:hsl(26,72%,64%);background:hsla(26,60%,45%,0.15);border:1px solid hsla(26,60%,52%,0.35);">树洞</span>
+            <div class="post-card-title">救命啊独居女生快被家里的电器吓哭了，是不是进贼了还是漏电啊？</div>
+            <div class="post-excerpt">家人们谁懂啊，我真的要崩溃了😭😭。我一个人租在腾岳市高新区那边的公寓，最近几天家里的电器特别邪门！前天半夜，我那个小爱音箱突然自己亮了，</div>
+            <div class="post-card-meta">
+                <span class="mi">👤 软糖不软_</span>
+                <span class="mi">💬 24回复</span>
+                <span class="mi">👁 3062浏览</span>
+            </div></div><div class="post-card">
+            <span class="post-cat" style="color:hsl(218,72%,64%);background:hsla(218,60%,45%,0.15);border:1px solid hsla(218,60%,52%,0.35);">吐槽</span>
+            <div class="post-card-title">腾岳市这破车企能不能行了？车机中病毒差点害老子出车祸！</div>
+            <div class="post-excerpt">老子真特么服了！今天跑夜班，开着那破新能源跑滴滴。走到腾岳大道高架上的时候，中控屏突然“唰”一下全变成雪花屏了！导航也不说话了，一直瞎指，让</div>
+            <div class="post-card-meta">
+                <span class="mi">👤 腾岳老李代驾</span>
+                <span class="mi">💬 24回复</span>
+                <span class="mi">👁 9924浏览</span>
+            </div></div><div class="post-card">
+            <span class="post-cat" style="color:hsl(231,72%,64%);background:hsla(231,60%,45%,0.15);border:1px solid hsla(231,60%,52%,0.35);">探究</span>
+            <div class="post-card-title">腾岳市翠湖小区全网瘫痪，测出异常电波，这到底是怎么回事？</div>
+            <div class="post-excerpt">大家好，我是数码区UP主老张。今天发个帖记录一下我们小区发生的诡异事件。 坐标腾岳市翠湖小区，今晚8点左右，整个小区的网络突然全断了。不仅是</div>
+            <div class="post-card-meta">
+                <span class="mi">👤 极客老张</span>
+                <span class="mi">💬 25回复</span>
+                <span class="mi">👁 2488浏览</span>
+            </div></div><div class="post-card">
+            <span class="post-cat" style="color:hsl(26,72%,64%);background:hsla(26,60%,45%,0.15);border:1px solid hsla(26,60%,52%,0.35);">树洞</span>
+            <div class="post-card-title">爷爷走失半个月了，他留下的旧八音盒突然自己响了，我该怎么办？</div>
+            <div class="post-excerpt">家人们，我现在手都在抖，不知道该怎么形容我现在的心情。我爷爷半个月前因为重病，从医院走失了一直没找到，警察说大概率是……不行了。今天整理他遗</div>
+            <div class="post-card-meta">
+                <span class="mi">👤 念旧的猫_</span>
+                <span class="mi">💬 25回复</span>
+                <span class="mi">👁 4227浏览</span>
+            </div></div><div class="post-card">
+            <span class="post-cat" style="color:hsl(218,72%,64%);background:hsla(218,60%,45%,0.15);border:1px solid hsla(218,60%,52%,0.35);">吐槽</span>
+            <div class="post-card-title">家里监控拍到马赛克黑影，电视半夜自己放戏曲，我快崩溃了！</div>
+            <div class="post-excerpt">兄弟们，我最近真的要被折磨疯了。我妈患有重度阿尔茨海默症，上个月从养老院走失，至今没找到。我为了找她，在家里装了智能监控。 结果昨晚半夜，我</div>
+            <div class="post-card-meta">
+                <span class="mi">👤 老赵不喝酒</span>
+                <span class="mi">💬 24回复</span>
+                <span class="mi">👁 3976浏览</span>
+            </div></div><div class="post-card">
+            <span class="post-cat" style="color:hsl(218,72%,64%);background:hsla(218,60%,45%,0.15);border:1px solid hsla(218,60%,52%,0.35);">吐槽</span>
+            <div class="post-card-title">绝症哥们失踪后，他的Steam账号半夜上线给我发暗语，盗号狗太缺德了！</div>
+            <div class="post-excerpt">兄弟们，我特么真的要气炸了！我发小半个月前因为绝症在医院失踪了，大概率是人不行了不想让我们看到。结果今晚半夜，他的Steam账号突然上线了！</div>
+            <div class="post-card-meta">
+                <span class="mi">👤 峡谷第一亚索</span>
+                <span class="mi">💬 24回复</span>
+                <span class="mi">👁 2042浏览</span>
+            </div></div><div class="post-card">
+            <span class="post-cat" style="color:hsl(40,72%,64%);background:hsla(40,60%,45%,0.15);border:1px solid hsla(40,60%,52%,0.35);">求助</span>
+            <div class="post-card-title">我老婆半年前车祸走了，今晚她的旧手机突然给我发短信……</div>
+            <div class="post-excerpt">兄弟们，我现在手抖得连字都打不利索。我老婆半年前出车祸走了，她的旧手机我一直放在床头柜上充着电，当个念想。就在刚才凌晨两点，那手机突然亮了，</div>
+            <div class="post-card-meta">
+                <span class="mi">👤 等风也等她_</span>
+                <span class="mi">💬 24回复</span>
+                <span class="mi">👁 2239浏览</span>
+            </div></div><div class="post-card">
+            <span class="post-cat" style="color:hsl(218,72%,64%);background:hsla(218,60%,45%,0.15);border:1px solid hsla(218,60%,52%,0.35);">吐槽</span>
+            <div class="post-card-title">两年前溺水的弟弟，他的平板半夜自动画画，画了个阴间建筑！</div>
+            <div class="post-excerpt">各位吧友，我遇到件极其邪门的事。我弟弟两年前在腾岳市水库溺水走了，他的平板电脑我一直放在书房抽屉里没动过。今晚我加班，那平板突然自己亮屏了，</div>
+            <div class="post-card-meta">
+                <span class="mi">👤 理智的破壁人</span>
+                <span class="mi">💬 23回复</span>
+                <span class="mi">👁 8126浏览</span>
+            </div></div><div class="post-card">
+            <span class="post-cat" style="color:hsl(151,72%,64%);background:hsla(151,60%,45%,0.15);border:1px solid hsla(151,60%,52%,0.35);">直播</span>
+            <div class="post-card-title">我妈三个月前病逝，刚才她微信发语音让我去接她，我正在路上！</div>
+            <div class="post-excerpt">家人们，我快要疯了。我妈三个月前因病去世，她的微信号我一直留着没删。就在十分钟前，她突然给我发了一条语音，声音特别虚弱，说：“囡囡，来接我，</div>
+            <div class="post-card-meta">
+                <span class="mi">👤 妈妈的小棉袄</span>
+                <span class="mi">💬 24回复</span>
+                <span class="mi">👁 7008浏览</span>
+            </div></div><div class="post-card">
+            <span class="post-cat" style="color:hsl(40,72%,64%);background:hsla(40,60%,45%,0.15);border:1px solid hsla(40,60%,52%,0.35);">求助</span>
+            <div class="post-card-title">我发小的女朋友一个月前突然失踪了，他现在魔怔了，救救孩子吧...</div>
+            <div class="post-excerpt">吧友们帮帮忙，我实在没招了。我铁哥们（叫他大伟吧）的女朋友，刚好一个月前突然人没了。那天是周末，本来是约定好的双方个人时间，但大伟等到第二天</div>
+            <div class="post-card-meta">
+                <span class="mi">👤 热心市民老王_</span>
+                <span class="mi">💬 21回复</span>
+                <span class="mi">👁 3936浏览</span>
+            </div></div></div>
+    </div>
+</section>
+
+<!-- ============ 视图3：帖子详情页 ============ -->
+<section class="view" id="view-detail">
+    <header class="site-header">
+        <div class="site-logo" id="logoHome2">深渊论坛</div>
+        <div class="header-right">
+            <span class="online-count" id="onlineBox2">当前在线：<b id="onlineNum2">646</b> 人</span>
+            <span class="cur-user" id="curUserBox2">亡魂 · 管理员</span>
+            <button class="btn-logout" id="btnLogout2">离开</button>
+        </div>
+    </header>
+    <div class="container">
+        <button class="btn-back" id="btnBack">← 返回亡魂列表</button>
+        <h1 class="detail-title" id="detailTitle"></h1>
+        <div class="detail-sub" id="detailSub"></div>
+        <div id="floorList"></div>
+        <button class="btn-loadmore" id="btnLoadMore">↓ 加载更多回复 ↓</button>
+    </div>
+</section>
+
+<script>
+/* ============================================================
+   全局状态
+   ============================================================ */
+const State = {
+    user: '访客',
+    isAdmin: false,     // 是否管理员（控制解析器可见）
+    idColors: {},       // ID -> 头像圆颜色（同名同色，跨帖子一致）
+    catColors: {},      // 分类 -> 色相 hue（同类同色，跨帖子一致）
+    posts: [],          // 所有帖子数据
+    currentPostId: null,
+    visibleFloors: 0,   // 详情页当前已显示的楼层数
+    FLOOR_STEP: 5       // 每次"加载更多"增加的楼层数
+};
+
+/* 便捷选择器 */
+const $ = (id) => document.getElementById(id);
+
+/* ============================================================
+   视图切换
+   ============================================================ */
+function showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    $('view-' + name).classList.add('active');
+    window.scrollTo(0, 0);
+}
+
+/* ============================================================
+   ID 头像颜色：同一个 ID 始终得到同一颜色（跨帖子一致）
+   特例：“观测者_04” 固定为纯黑
+   ============================================================ */
+function randColor() {
+    // 中等饱和、偏暗的色调，保证白字可读
+    const h = Math.floor(Math.random() * 360);
+    const s = 35 + Math.floor(Math.random() * 25);  // 35% ~ 60%
+    const l = 38 + Math.floor(Math.random() * 12);  // 38% ~ 50%
+    return `hsl(${h}, ${s}%, ${l}%)`;
+}
+function getIdColor(id) {
+    if (id === '观测者_04') return '#000000';          // 特例：纯黑
+    if (!State.idColors[id]) State.idColors[id] = randColor();
+    return State.idColors[id];
+}
+function firstChar(id) {
+    const s = (id || '').trim();
+    return s ? [...s][0] : '?';               // 取首字（兼容 emoji/生僻字）
+}
+
+/* 分类标签颜色：同一类型始终同一色相（跨帖子一致），返回 hue */
+function getCatColor(cat) {
+    if (!cat) return 0;
+    if (State.catColors[cat] == null) State.catColors[cat] = Math.floor(Math.random() * 360);
+    return State.catColors[cat];
+}
+
+/* ============================================================
+   背景幽灵字：随机生成几个缓慢浮动的汉字
+   ============================================================ */
+function initGhosts() {
+    const chars = ['魂', '殁', '亡', '祭', '囚', '噬'];
+    const layer = $('ghostLayer');
+    const count = 5;
+    for (let i = 0; i < count; i++) {
+        const g = document.createElement('div');
+        g.className = 'ghost-char';
+        g.textContent = chars[Math.floor(Math.random() * chars.length)];
+        g.style.top = Math.random() * 80 + '%';
+        g.style.left = Math.random() * 80 + '%';
+        g.style.fontSize = (Math.random() * 15 + 15) + 'vw';
+        g.style.animationDelay = (Math.random() * -22) + 's';
+        g.style.animationDuration = (Math.random() * 12 + 18) + 's';
+        layer.appendChild(g);
+    }
+}
+
+/* ============================================================
+   恐怖彩蛋：在线人数异常跳动
+   正常在数百内波动，小概率闪现 -1 / 0
+   ============================================================ */
+function initOnlineCounter() {
+    function tick() {
+        const roll = Math.random();
+        let num;
+        let abnormal = false;
+        if (roll < 0.04) {          // 4% 概率显示 -1
+            num = -1; abnormal = true;
+        } else if (roll < 0.07) {   // 3% 概率显示 0
+            num = 0; abnormal = true;
+        } else {
+            num = Math.floor(Math.random() * 400) + 300; // 300~699
+        }
+        [['onlineNum','onlineBox'], ['onlineNum2','onlineBox2']].forEach(([n, b]) => {
+            const numEl = $(n), boxEl = $(b);
+            if (numEl) numEl.textContent = num;
+            if (boxEl) boxEl.classList.toggle('abnormal', abnormal);
+        });
+        // 下一次跳动的间隔也随机
+        setTimeout(tick, Math.random() * 2500 + 1500);
+    }
+    tick();
+}
+
+/* ============================================================
+   登录逻辑
+   ============================================================ */
+function doLogin() {
+    const name = $('inpUser').value.trim();
+    const pass = $('inpPass').value;
+    // 管理员校验：只有这对账密才能看到解析器
+    const isAdmin = (name === 'yekong719' && pass === '461957613');
+    State.isAdmin = isAdmin;
+    State.user = isAdmin ? '管理员' : (name || '无名氏');
+    ['curUserBox','curUserBox2'].forEach(id => { if ($(id)) $(id).textContent = '亡魂 · ' + State.user; });
+    // 解析器面板仅管理员可见
+    $('parserPanel').style.display = isAdmin ? 'block' : 'none';
+    showView('list');
+    renderPostList();
+    if (isAdmin) showToast('欢迎管理员登入');
+}
+function doLogout() {
+    $('inpUser').value = '';
+    $('inpPass').value = '';
+    showView('login');
+}
+
+/* ============================================================
+   渲染帖子列表
+   ============================================================ */
+function renderPostList() {
+    const box = $('postList');
+    box.innerHTML = '';
+    if (State.posts.length === 0) {
+        box.innerHTML = '<div style="color:var(--text-faint);text-align:center;padding:40px;">…这里空无一物，或者说，暂时还看不见。</div>';
+        return;
+    }
+    State.posts.forEach(post => {
+        const card = document.createElement('div');
+        card.className = 'post-card';
+        const replyCount = Math.max(0, post.floors.length - 1);          // 回复数 = 楼层数 - 1
+        const opName = post.floors[0] ? post.floors[0].author : '未知';
+        const views = post.views != null ? post.views : 0;
+        // 分类标签（来自标题【】），同类同色
+        let catHTML = '';
+        if (post.category) {
+            const h = getCatColor(post.category);
+            catHTML = `<span class="post-cat" style="color:hsl(${h},72%,64%);background:hsla(${h},60%,45%,0.15);border:1px solid hsla(${h},60%,52%,0.35);">${escapeHTML(post.category)}</span>`;
+        }
+        const excerpt = post.excerpt || '';
+        card.innerHTML = `
+            ${catHTML}
+            <div class="post-card-title">${escapeHTML(post.titleClean || post.title)}</div>
+            ${excerpt ? `<div class="post-excerpt">${escapeHTML(excerpt)}</div>` : ''}
+            <div class="post-card-meta">
+                <span class="mi">👤 ${escapeHTML(opName)}</span>
+                <span class="mi">💬 ${replyCount}回复</span>
+                <span class="mi">👁 ${views}浏览</span>
+            </div>`;
+        card.addEventListener('click', () => openPost(post.id));
+        box.appendChild(card);
+    });
+}
+
+/* ============================================================
+   打开帖子详情
+   ============================================================ */
+function openPost(id) {
+    const post = State.posts.find(p => p.id === id);
+    if (!post) return;
+    State.currentPostId = id;
+    State.visibleFloors = State.FLOOR_STEP;
+    $('detailTitle').textContent = post.title;
+    $('detailSub').textContent = `楼主：${post.floors[0] ? post.floors[0].author : '未知'} · 共 ${post.floors.length} 层 · ${post.date || ''}`;
+    renderFloors();
+    showView('detail');
+}
+
+/* 渲染楼层（受 visibleFloors 限制，配合"加载更多"） */
+function renderFloors() {
+    const post = State.posts.find(p => p.id === State.currentPostId);
+    if (!post) return;
+    const box = $('floorList');
+    box.innerHTML = '';
+    const shown = post.floors.slice(0, State.visibleFloors);
+    shown.forEach((floor, idx) => {
+        // 楼主判定改为“作者 == 本帖楼主 ID”，楼主的所有回复都保持金边
+        const isOP = (floor.author === post.opId);
+        const color = getIdColor(floor.author);
+        const initial = firstChar(floor.author);
+        const el = document.createElement('div');
+        el.className = 'floor' + (isOP ? ' op' : '');
+        el.innerHTML = `
+            <div class="floor-head">
+                <div class="floor-user">
+                    <div class="floor-avatar" style="background:${color}">${escapeHTML(initial)}</div>
+                    <div class="floor-name">${escapeHTML(floor.author)}${isOP ? '<span class="floor-badge">楼主</span>' : ''}</div>
+                </div>
+                <div class="floor-num">${floor.floorLabel || ('#' + (idx + 1))}</div>
+            </div>
+            <div class="floor-body">${floor.contentHTML}</div>`;
+        box.appendChild(el);
+    });
+    // 控制"加载更多"按钮显隐
+    $('btnLoadMore').style.display = (State.visibleFloors >= post.floors.length) ? 'none' : 'block';
+}
+
+function loadMoreFloors() {
+    State.visibleFloors += State.FLOOR_STEP;
+    renderFloors();
+}
+
+/* ============================================================
+   工具：HTML 转义（防止用户正文破坏结构）
+   注意：正文富文本标签由解析器可控生成，这里只转义纯文本字段
+   ============================================================ */
+function escapeHTML(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+/* ============================================================
+   ★ 帖子解析器 ★
+   输入格式说明（见 parserHint）：
+   ==============================
+   **帖子N：标题文字**
+   ==============================
+
+   **1楼**
+   **ID：某某某**
+   正文行1
+   正文行2
+   > 这是一段引用
+   [恐怖]这段会高亮显示[/恐怖]
+
+   **2楼**
+   **ID：另一个人**
+   回复内容……
+   ------------------------------------------------------------
+   解析规则：
+   - "====" 行作为标题分隔，其间的 **帖子N：xxx** 为标题
+   - "**N楼**" 开启一个新楼层
+   - "**ID：xxx**" 指定该楼层作者
+   - 其余文本为正文；空行分段
+   - 行首 ">" → 引用块 quote-block
+   - [恐怖]...[/恐怖] → creepy-text 高亮
+   ============================================================ */
+function parsePosts(raw) {
+    if (!raw || !raw.trim()) throw new Error('输入为空，无魂可招。');
+
+    // 按 ==== 分隔线切分出每个帖子块
+    // 分隔线：一整行由 = 组成（>=6个）
+    const chunks = raw.split(/\n={6,}\n?/);
+    const blocks = [];
+    // 重新组织：标题行夹在两条 ==== 之间，正文在其后，直到下一个标题块
+    // 更稳妥的做法：用正则找出所有 "**帖子...：标题**" 作为切割点
+    const titleRe = /\*\*帖子[^：:]*[：:]\s*(.+?)\*\*/;
+
+    // 先把整段按行处理，识别标题位置
+    const lines = raw.split('\n');
+    let cur = null;
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        const trimmed = line.trim();
+
+        // 跳过纯 ==== 分隔线
+        if (/^={6,}$/.test(trimmed)) continue;
+
+        // 标题行
+        const tMatch = trimmed.match(titleRe);
+        if (tMatch) {
+            if (cur) blocks.push(cur);
+            cur = { title: tMatch[1].trim(), floors: [], _cur: null };
+            continue;
+        }
+        if (!cur) continue; // 标题出现前的内容忽略
+
+        // 楼层行： **N楼**
+        const fMatch = trimmed.match(/^\*\*\s*(\d+)\s*楼\s*\*\*$/);
+        if (fMatch) {
+            cur._cur = { floorLabel: '#' + fMatch[1] + ' 楼', author: '匿名', lines: [] };
+            cur.floors.push(cur._cur);
+            continue;
+        }
+
+        // 作者行： **ID：xxx**
+        const idMatch = trimmed.match(/^\*\*\s*ID\s*[：:]\s*(.+?)\s*\*\*$/);
+        if (idMatch) {
+            if (cur._cur) cur._cur.author = idMatch[1].trim();
+            else { // ID 出现在楼层声明之前，自动补一个楼层
+                cur._cur = { floorLabel: '#' + (cur.floors.length + 1), author: idMatch[1].trim(), lines: [] };
+                cur.floors.push(cur._cur);
+            }
+            continue;
+        }
+
+        // 普通正文行（含空行，用于分段）
+        if (cur._cur) cur._cur.lines.push(line);
+    }
+    if (cur) blocks.push(cur);
+
+    if (blocks.length === 0) throw new Error('未识别到任何帖子。请检查标题格式：**帖子N：标题**');
+
+    // 把每个 block 转成正式 post 数据结构
+    const result = blocks.map(b => {
+        if (b.floors.length === 0) {
+            // 没有显式楼层，把标题下所有内容当作 1 楼
+            b.floors.push({ floorLabel: '#1 楼', author: '楼主', lines: [] });
+        }
+        const floors = b.floors.map((f, idx) => ({
+            floorLabel: f.floorLabel || ('#' + (idx + 1)),
+            author: f.author || '匿名',
+            contentHTML: linesToHTML(f.lines)
+        }));
+        // 上传时就锁定每个 ID 的头像颜色（同名同色、跨帖子一致）
+        floors.forEach(f => getIdColor(f.author));
+        // 分类标签：取标题【】内文字；并锁定分类颜色
+        const catMatch = b.title.match(/【(.+?)】/);
+        const category = catMatch ? catMatch[1].trim() : '';
+        const titleClean = b.title.replace(/【.+?】/, '').trim();
+        if (category) getCatColor(category);
+        // 正文摘要：楼主楼层纯文本（去掉标记）
+        let excerpt = '';
+        if (b.floors[0]) {
+            excerpt = b.floors[0].lines.join(' ')
+                .replace(/\[\/?恐怖\]/g, '')
+                .replace(/^\s*>\s?/gm, '')
+                .replace(/\*\*/g, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 70);
+        }
+        // 浏览量：录入时随机 2000~10000
+        const views = Math.floor(Math.random() * 8001) + 2000;
+        return {
+            id: 'p_' + (Date.now().toString(36)) + '_' + Math.random().toString(36).slice(2, 6),
+            title: b.title,
+            titleClean: titleClean || b.title,
+            category: category,
+            excerpt: excerpt,
+            views: views,
+            date: '刚刚',
+            opId: floors[0] ? floors[0].author : '',   // 本帖楼主 ID
+            floors
+        };
+    });
+    return result;
+}
+
+/* 把一组正文行转换为安全的富文本 HTML */
+function linesToHTML(lines) {
+    // 去掉首尾空行
+    while (lines.length && !lines[0].trim()) lines.shift();
+    while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+    if (lines.length === 0) return '<p style="color:var(--text-faint)">（此楼无内容）</p>';
+
+    const html = [];
+    lines.forEach(line => {
+        const t = line.trim();
+        if (t === '') return; // 空行用于分段，直接跳过（段落已分开）
+        // 引用块
+        if (t.startsWith('>')) {
+            const q = inlineFormat(t.replace(/^>\s?/, ''));
+            html.push(`<div class="quote-block">${q}</div>`);
+        } else {
+            html.push(`<p>${inlineFormat(t)}</p>`);
+        }
+    });
+    return html.join('');
+}
+
+/* 行内格式：先转义，再把 [恐怖]...[/恐怖] 变成 creepy-text */
+function inlineFormat(text) {
+    let safe = escapeHTML(text);
+    // [恐怖]xxx[/恐怖] → 高亮
+    safe = safe.replace(/\[恐怖\]([\s\S]*?)\[\/恐怖\]/g, '<span class="creepy-text">$1</span>');
+    // **粗体** → 加强
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:var(--text-main)">$1</strong>');
+    return safe;
+}
+
+/* 执行解析并插入列表顶部 */
+function runParser() {
+    const raw = $('parserInput').value;
+    const msg = $('parseMsg');
+    try {
+        const newPosts = parsePosts(raw);
+        // 新帖子插到最前
+        State.posts = newPosts.concat(State.posts);
+        renderPostList();
+        msg.className = 'parse-msg ok';
+        msg.textContent = `✔ 招魂成功，新增 ${newPosts.length} 篇帖子（共 ${newPosts.reduce((s,p)=>s+p.floors.length,0)} 层）。`;
+    } catch (e) {
+        msg.className = 'parse-msg err';
+        msg.textContent = '✘ 解析失败：' + e.message;
+    }
+}
+
+/* ============================================================
+   示例数据
+   ============================================================ */
+const DEMO_TEXT = `==============================
+**帖子7：【求助】我老婆半年前车祸走了，今晚她的旧手机突然给我发短信……**
+==============================
+
+**1楼**
+**ID：等风也等她_**
+兄弟们，我现在手抖得连字都打不利索。
+半年前的今天，我老婆在高架桥上出了车祸，人当场就没了。她的旧手机我一直没舍得停机，放在床头柜充着电。
+今晚十一点零七分，那个手机亮了。
+[恐怖]屏幕上是她的号码，发来三个字：我好冷。[/恐怖]
+
+**2楼**
+**ID：夜班司机老陈**
+楼主别怕，会不会是运营商延迟短信？我以前也收到过朋友几年前发的信息。
+
+**3楼**
+**ID：等风也等她_**
+不可能。我刚回了一句"你是谁"。
+> 对方回复：你把窗户关上了，我进不来。
+我家住18楼，窗户一直是开的。我刚才……去看了一眼。
+
+**4楼**
+**ID：匿名潜水员**
+[恐怖]窗户现在是关着的吗？[/恐怖]
+
+**5楼**
+**ID：等风也等她_**
+是关着的。
+可我一个人住。`;
+
+/* ============================================================
+   轻提示 Toast
+   ============================================================ */
+function showToast(text) {
+    const t = $('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ============================================================
+   导出为独立网页：把当前所有帖子【烤】进一个新 HTML，
+   发给别人时无需解析器、打开即可浏览全部帖子
+   ============================================================ */
+function exportHTML() {
+    if (State.posts.length === 0) { showToast('当前没有帖子，先“招魂”再导出'); return; }
+    // 把帖子数据 + 颜色表序列化（转义 </ 防止提前闭合 script）
+    const postsJSON  = JSON.stringify(State.posts).replace(/<\//g, '<\\/');
+    const colorsJSON = JSON.stringify(State.idColors).replace(/<\//g, '<\\/');
+    const catsJSON   = JSON.stringify(State.catColors).replace(/<\//g, '<\\/');
+    const dataScript = '<script>window.__PRELOADED_POSTS__=' + postsJSON +
+                       ';window.__PRELOADED_COLORS__=' + colorsJSON +
+                       ';window.__PRELOADED_CATS__=' + catsJSON + ';<\/script>';
+    // 清理运行时状态：导出页从登录页开始、幽灵字不重复、隐藏解析器
+    showView('login');
+    $('ghostLayer').innerHTML = '';
+    $('parserInput').value = '';
+    $('parserPanel').style.display = 'none';
+    // 抓取当前完整 HTML，并在 <body> 后注入预加载数据（早于主脚本执行）
+    let html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    html = html.replace('<body>', '<body>\n' + dataScript);
+    // 触发下载
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '深渊论坛_导出.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    // 恢复管理员当前视图
+    initGhosts();
+    $('parserPanel').style.display = 'block';
+    showView('list');
+    showToast('已导出：深渊论坛_导出.html（含全部帖子）');
+}
+
+/* ============================================================
+   事件绑定（不在 HTML 里写 onclick）
+   ============================================================ */
+function bindEvents() {
+    $('btnEnter').addEventListener('click', doLogin);
+    $('inpUser').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+    $('inpPass').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+
+    $('btnLogout').addEventListener('click', doLogout);
+    $('btnLogout2').addEventListener('click', doLogout);
+
+    $('btnBack').addEventListener('click', () => { showView('list'); renderPostList(); });
+    $('btnLoadMore').addEventListener('click', loadMoreFloors);
+
+    $('logoHome').addEventListener('click', () => showView('list'));
+    $('logoHome2').addEventListener('click', () => { showView('list'); renderPostList(); });
+
+    // 解析器面板展开/收起
+    $('parserToggle').addEventListener('click', () => {
+        const body = $('parserBody');
+        const open = body.classList.toggle('open');
+        $('parserToggleTxt').textContent = open ? '[ 收起 ]' : '[ 展开 ]';
+    });
+    $('btnParse').addEventListener('click', runParser);
+    $('btnParseDemo').addEventListener('click', () => {
+        $('parserInput').value = DEMO_TEXT;
+        $('parseMsg').textContent = '';
+    });
+    $('btnExport').addEventListener('click', exportHTML);
+}
+
+/* ============================================================
+   初始化
+   ============================================================ */
+function init() {
+    initGhosts();
+    initOnlineCounter();
+    bindEvents();
+
+    // 解析器格式提示
+    $('parserHint').textContent =
+`【招魂格式】
+==============================
+**帖子N：标题文字**
+==============================
+
+**1楼**
+**ID：用户名**
+正文……（空行分段）
+> 行首加 > 变成引用块
+[恐怖]被此标记包裹的文字会暗红发光[/恐怖]
+
+**2楼**
+**ID：另一位**
+回复内容……`;
+
+    // 预定义颜色：“观测者_04” 固定纯黑
+    State.idColors['观测者_04'] = '#000000';
+
+    // 预加载：导出的网页会在 <body> 后注入 __PRELOADED_POSTS__ / __PRELOADED_COLORS__
+    if (window.__PRELOADED_COLORS__ && typeof window.__PRELOADED_COLORS__ === 'object') {
+        Object.assign(State.idColors, window.__PRELOADED_COLORS__);
+    }
+    if (window.__PRELOADED_CATS__ && typeof window.__PRELOADED_CATS__ === 'object') {
+        Object.assign(State.catColors, window.__PRELOADED_CATS__);
+    }
+    if (Array.isArray(window.__PRELOADED_POSTS__)) {
+        State.posts = window.__PRELOADED_POSTS__;   // 供普通访客直接浏览
+    } else {
+        State.posts = [];                           // 默认空论坛（不再自带示例帖）
+    }
+}
+
+init();
+</script>
+
+
+<div></div></body></html>
